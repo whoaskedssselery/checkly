@@ -4,7 +4,8 @@
   "scripts": {
     "migrate": "prisma migrate dev --name init",
     "generate": "prisma generate",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "reset": "prisma migrate reset --force"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0"

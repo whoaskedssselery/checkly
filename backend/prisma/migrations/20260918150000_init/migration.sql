@@ -51,14 +51,22 @@ CREATE TABLE "tasks" (
     CONSTRAINT "tasks_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+-- Регистронезависимая уникальность email (issue #1)
+CREATE UNIQUE INDEX users_email_lower_key ON users (LOWER(email));
+
+-- Ограничение на допустимые приоритеты (issue #2)
+ALTER TABLE tasks
+ADD CONSTRAINT priority_check
+CHECK (priority IS NULL OR priority IN ('low', 'medium', 'high'));
 
 -- CreateIndex
 CREATE INDEX "idx_boards_owner" ON "boards"("owner_id");
 
 -- CreateIndex
 CREATE INDEX "idx_columns_board" ON "board_columns"("board_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "board_columns_board_id_key" ON "board_columns"("board_id", "id");
 
 -- CreateIndex
 CREATE INDEX "idx_tasks_board" ON "tasks"("board_id");
@@ -84,8 +92,9 @@ ADD CONSTRAINT "tasks_board_id_fkey"
 FOREIGN KEY ("board_id") REFERENCES "boards"("id")
 ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
+-- Составной FK: задача может ссылаться только на колонку своей доски (issue #3)
 ALTER TABLE "tasks"
-ADD CONSTRAINT "tasks_column_id_fkey"
-FOREIGN KEY ("column_id") REFERENCES "board_columns"("id")
+ADD CONSTRAINT "tasks_board_id_column_id_fkey"
+FOREIGN KEY ("board_id", "column_id")
+REFERENCES "board_columns"("board_id", "id")
 ON DELETE RESTRICT ON UPDATE CASCADE;
