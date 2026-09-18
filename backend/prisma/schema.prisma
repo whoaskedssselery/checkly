@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  email        String   @unique @db.VarChar(150)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  avatarColor  String?  @map("avatar_color") @db.VarChar(7)
+  createdAt    DateTime @default(now()) @map("created_at")
+  boards       Board[]  @relation("BoardOwner")
+
+  @@map("users")
+}
+
+model Board {
+  id        Int           @id @default(autoincrement())
+  name      String        @db.VarChar(150)
+  ownerId   Int           @map("owner_id")
+  createdAt DateTime      @default(now()) @map("created_at")
+  owner     User          @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  columns   BoardColumn[]
+  tasks     Task[]
+
+  @@index([ownerId], name: "idx_boards_owner")
+  @@map("boards")
+}
+
+model BoardColumn {
+  id        Int      @id @default(autoincrement())
+  boardId   Int      @map("board_id")
+  name      String   @db.VarChar(50)
+  color     String?  @db.VarChar(7)
+  positionX Float    @default(0) @map("position_x")
+  positionY Float    @default(0) @map("position_y")
+  createdAt DateTime @default(now()) @map("created_at")
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@index([boardId], name: "idx_columns_board")
+  @@map("board_columns")
+}
+
+model Task {
+  id          Int         @id @default(autoincrement())
+  boardId     Int         @map("board_id")
+  columnId    Int         @map("column_id")
+  title       String      @db.VarChar(255)
+  description String?
+  priority    String?     @db.VarChar(10)
+  tags        String[]    @default([])
+  positionX   Float       @default(0) @map("position_x")
+  positionY   Float       @default(0) @map("position_y")
+  dueDate     DateTime?   @map("due_date")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  board       Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column      BoardColumn @relation(fields: [columnId], references: [id], onDelete: Restrict)
+
+  @@index([boardId], name: "idx_tasks_board")
+  @@index([columnId], name: "idx_tasks_column")
+  @@map("tasks")
+}
