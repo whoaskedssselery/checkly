@@ -1,0 +1,115 @@
+@use './tokens';
+@use './bench' as bench;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--deck);
+  color: var(--room);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  position: relative;
+  overflow: hidden;
+}
+
+// Film grain over the whole room — fixed, so it belongs to the lens and
+// not to the content that scrolls under it. One tiled turbulence filter,
+// no raster asset.
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.055;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+// ---- Browser surfaces -------------------------------------------------
+// The parts we did not draw still belong to this room: the caret is a
+// grease pencil, the selection is a strip of tape, the scrollbar is a
+// rail on the bench.
+::selection {
+  background: var(--tape-face-strong);
+  color: var(--room);
+}
+
+.lit ::selection,
+:where(.lit)::selection {
+  color: var(--emulsion);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--deck-sunken);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border: 3px solid var(--deck-sunken);
+  border-radius: 99px;
+
+  &:hover {
+    background: var(--room-faint);
+  }
+}
+
+input,
+textarea {
+  caret-color: var(--accent);
+}
+
+:focus-visible {
+  @include bench.focus-ring;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+// Numbers are measurement everywhere in this product; never let them
+// reflow as they count.
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

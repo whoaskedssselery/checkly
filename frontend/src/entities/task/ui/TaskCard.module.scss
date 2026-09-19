@@ -1,0 +1,153 @@
+@use '../../../app/styles/bench' as bench;
+
+// A clip of film lying on the deck over a light box: a sprocket edge down
+// one side, a lit frame beside it, one strip of tape across the head.
+//
+// One strip, not two. Tape that lands on the words is not tape, it is a
+// sticker — the strip sits on the card's top margin and overhangs onto the
+// deck, which is how you actually tape something down.
+.clip {
+  position: relative;
+  display: flex;
+  width: 252px;
+  border-radius: var(--r-md);
+  cursor: grab;
+  overflow: visible;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.perf {
+  @include bench.perf-strip(var(--deck));
+  width: 11px;
+  flex: none;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+}
+
+// Lit from behind, and falling off down the frame — that is the whole
+// reason a pale card is allowed on a dark deck here.
+.frame {
+  flex: 1;
+  min-width: 0;
+  background: linear-gradient(
+    176deg,
+    var(--frame-lit) 0%,
+    var(--frame) 46%,
+    var(--frame-fall) 100%
+  );
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  border: 1px solid var(--frame-edge);
+  border-left: 1px solid rgba(0, 0, 0, 0.16);
+  padding: 13px 14px 11px;
+}
+
+// Tier one: the marks that identify the clip. Small, dim, out of the way.
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.code {
+  @include bench.mono-data(9px);
+  color: var(--emulsion-dim);
+  letter-spacing: 0.1em;
+}
+
+.prio {
+  @include bench.slate(9px, 600);
+  color: var(--emulsion-dim);
+}
+
+.high {
+  color: var(--accent-dim);
+}
+
+// Tier two: the task. This is the only thing on the card with real weight.
+.titleWrap {
+  position: relative;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 550;
+  letter-spacing: -0.012em;
+  line-height: 1.28;
+  color: var(--emulsion);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// A wax stroke under the title, the way an editor rings a select. Drawn,
+// uneven and slightly over-running the word — a badge would say the same
+// thing and mean nothing.
+.swipe {
+  position: absolute;
+  left: -4px;
+  right: -6px;
+  bottom: -5px;
+  height: 9px;
+  color: var(--accent);
+  pointer-events: none;
+}
+
+// One line of the brief, when there is one. It is the difference between
+// a card you can act on and a card you have to open.
+.brief {
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--emulsion-dim);
+  margin: 6px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// Tier three: where it lives and when it is due.
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--frame-edge) 55%, transparent);
+}
+
+// A clip says what it is and when it is due. Which bin it sits in is
+// answered by where it sits — repeating the reel on the card was a label for
+// a fact the board already shows.
+.tag {
+  @include bench.mono-data(10px);
+  color: var(--emulsion-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.due {
+  margin-left: auto;
+  @include bench.mono-data(9.5px);
+  color: var(--emulsion-dim);
+  flex: none;
+}
+
+.overdue {
+  color: var(--danger-frame);
+  font-weight: 700;
+}
+
+.tape {
+  top: -9px;
+  left: 26px;
+}

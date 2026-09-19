@@ -1,0 +1,152 @@
+@use '../../app/styles/bench' as bench;
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  // A button says a verb. Setting that verb in tracked uppercase at 700
+  // made every action on every screen shout in the same voice.
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease,
+    box-shadow 140ms ease, transform 90ms ease;
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.42;
+  }
+
+  svg {
+    flex: none;
+  }
+}
+
+.sm {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+
+  // The compact size is for toolbars, and a toolbar on a tall window has
+  // room to be reachable rather than merely present.
+  @media (min-height: 760px) {
+    min-height: 40px;
+    padding: 0 16px;
+  }
+}
+
+// The grease-pencil mark: the one solid, saturated action in the room.
+// Deeper than the drawn accent so white sits on it at 5.3:1 — the bright
+// vermilion only clears 3.7:1, and dark ink on orange reads as a hazard
+// sticker. The shadow is a cast shadow with a real offset; a coloured halo
+// with no offset is a glow effect, not depth.
+.primary {
+  background: var(--accent-solid);
+  color: var(--accent-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 6px 14px -8px rgba(0, 0, 0, 0.8);
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent-solid) 86%, #fff);
+  }
+
+  &:active:not(:disabled) {
+    background: color-mix(in srgb, var(--accent-solid) 88%, #000);
+  }
+}
+
+// A machined control on the bench: a real border, a real well.
+.bench {
+  background: var(--deck-raised);
+  color: var(--room);
+  border-color: var(--rule-strong);
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--deck-raised) 80%, var(--room) 20%);
+    border-color: var(--room-faint);
+  }
+}
+
+// Quiet action — no border, no fill, still a real hit target.
+.ghost {
+  background: transparent;
+  color: var(--room-dim);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--room);
+  }
+}
+
+// The reject mark, filled. An outline read as the one button in the room
+// asking not to be trusted — every other committed action here (primary,
+// this one) is a solid chip, so a destructive action is filled the same way
+// and named by its label, never by colour alone.
+.danger {
+  background: var(--danger);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 6px 14px -8px rgba(0, 0, 0, 0.8);
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 88%, #fff);
+  }
+
+  &:active:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 88%, #000);
+  }
+}
+
+.loading {
+  pointer-events: none;
+
+  .label {
+    opacity: 0.35;
+  }
+}
+
+// A frame counter ticking while we wait — measurement, not a spinner.
+.spinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  @include bench.mono-data(11px);
+  letter-spacing: 0.2em;
+  animation: tick 900ms steps(4, end) infinite;
+}
+
+@keyframes tick {
+  0% {
+    content: '·';
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

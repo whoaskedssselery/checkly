@@ -1,0 +1,38 @@
+@use '../../../app/styles/bench' as bench;
+
+// Someone else's pointer on the deck. It used to carry a pulsing ring and a
+// coloured glow: a cursor that throbs is announcing that it is alive, which
+// is exactly what a real one never does. What identifies a teammate here is
+// their colour and their name, and that is enough.
+.wrap {
+  position: relative;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.arrow {
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.75));
+}
+
+// The same pairing as the bench bar — a coloured disc and a name on a dark
+// chip. A teammate looks like the same object wherever you meet them.
+.tag {
+  position: absolute;
+  left: 19px;
+  top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: var(--deck-raised);
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--room);
+}

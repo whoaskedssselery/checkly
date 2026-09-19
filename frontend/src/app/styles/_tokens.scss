@@ -1,0 +1,120 @@
+// Checkly — visual world: THE EDITING BENCH.
+//
+// A film editing bench, not a corkboard. The room is cold graphite; the
+// work is lit from underneath. Every task is a clip of film lying on the
+// deck over a light box, which is the one reason a pale card is allowed to
+// sit on a dark surface here: it is not light mode leaking through, it is
+// a frame being lit so you can read it. The deck, the rails, the panels
+// and every chrome surface stay dark, so there is never a question which
+// world you are in.
+//
+// Splice tape is the connective grammar of the whole system — it holds
+// clips to the deck, header plates to their bins, and sheets to the bench.
+// It is amber, translucent and perforated, because that is what splice
+// tape is; it is never decoration hung on a corner.
+//
+// This world is dark-native by its use scene (an edit bay is a dark room),
+// so there is deliberately no light variant. One committed world beats two
+// half-tuned ones.
+:root {
+  color-scheme: dark;
+
+  // ---- The room -------------------------------------------------------
+  --deck: #0f1213; // canvas floor
+  --deck-lift: #151a1c; // bench rails, top bar, tool rail
+  --deck-raised: #1d2427; // menus, modal chrome, form wells
+  --deck-sunken: #0a0c0d; // recessed wells, scrollbar track
+
+  --rule: #232b2e; // hairline
+  --rule-strong: #35403f; // hairline that has to be seen
+  --rule-lit: rgba(216, 168, 81, 0.22); // frame rules on the deck
+
+  --room: #e4e7e5; // text on the deck
+  --room-dim: #98a2a0; // secondary text on the deck (7.3:1)
+  // Tertiary text. Tuned against --deck-raised, the lightest surface it ever
+  // lands on (4.8:1); on the deck itself it is 5.7:1. The previous value
+  // passed on the canvas floor and quietly failed at 4.25:1 on panels.
+  --room-faint: #868f8d;
+
+  // ---- The lit frame (a clip of film) ---------------------------------
+  --frame: #ece5d4; // card face, lit film base
+  --frame-lit: #f3ecdd; // where the light box is directly behind it
+  --frame-fall: #e2d9c3; // and where the light falls off — the contrast floor
+  --frame-edge-lit: #cfc7b3; // the sprocket edge of the stock
+  --frame-shade: #ded5c0; // the card's label band
+  --frame-edge: #b9ae95; // its cut edge
+  --emulsion: #17130e; // ink on the frame (13.6:1)
+  // Secondary ink. Measured against #e2d9c3, the darkest end of the frame's
+  // own gradient, not against its lightest: 4.8:1 there, 5.4:1 at the top.
+  --emulsion-dim: #635b4c;
+
+  // ---- Signals --------------------------------------------------------
+  // The accent is a grease pencil: the editor's own mark. It is the only
+  // hot colour in the room, and it is spent on action, selection, focus
+  // and "now" — never on decoration. Its contrast on the lit frame is
+  // 2.9:1, so on a card it may only ever be a drawn mark, never text.
+  --accent: #e8532c;
+  --accent-dim: #9e3518; // 5.0:1 on the darkest frame, 7.0:1 under white
+
+  // The same pencil, pressed harder, for anything that is a filled control.
+  // White on #e8532c is 3.7:1 and fails; white on this is 5.3:1, and it
+  // still clears 3:1 against the deck as a shape. Dark ink on orange was the
+  // other way out of that corner and it looked like a warning label.
+  --accent-solid: #bf3c16;
+  --accent-ink: #ffffff;
+
+  --danger: #cf3f57; // the reject mark — a cut, kept off the accent's hue
+  --danger-frame: #a3243c; // the same mark on a lit frame, where #cf3f57 is 3.3:1
+  --warn: #d8a851;
+  --ok: #8aa86a;
+
+  // ---- Splice tape ----------------------------------------------------
+  --tape: #d8a851;
+  --tape-face: rgba(216, 168, 81, 0.38);
+  --tape-face-strong: rgba(216, 168, 81, 0.55);
+  --tape-edge: rgba(255, 224, 160, 0.5);
+
+  // ---- Reel identity (bins) — waxy chinagraph, kept off the accent ----
+  --reel-1: #d9a441;
+  --reel-2: #cfc6b2;
+  --reel-3: #9aa35e;
+  --reel-4: #8d97a3;
+
+  // ---- Presence — a cool family, never confusable with a reel ---------
+  --live-1: #79a6cf;
+  --live-2: #a795d0;
+  --live-3: #63b8a6;
+
+  // ---- Depth ----------------------------------------------------------
+  // Every shadow carries an offset and a soft blur. The amber term is the
+  // light box spilling out from under a clip, not a halo.
+  --lift-rest: 0 1px 2px rgba(0, 0, 0, 0.55), 0 8px 18px -8px rgba(0, 0, 0, 0.7),
+    0 7px 26px -12px rgba(216, 168, 81, 0.3);
+  --lift-hover: 0 2px 5px rgba(0, 0, 0, 0.55), 0 18px 34px -12px rgba(0, 0, 0, 0.78),
+    0 10px 38px -14px rgba(216, 168, 81, 0.42);
+  --lift-drag: 0 6px 12px rgba(0, 0, 0, 0.5), 0 34px 56px -16px rgba(0, 0, 0, 0.85),
+    0 16px 58px -18px rgba(216, 168, 81, 0.5);
+  --lift-panel: 0 4px 10px rgba(0, 0, 0, 0.5), 0 32px 64px -20px rgba(0, 0, 0, 0.8);
+
+  // ---- Geometry -------------------------------------------------------
+  // A cut frame is nearly square-edged. Radii stay small on purpose; the
+  // soft 16px SaaS card is exactly what this world is not.
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 5px;
+  --r-lg: 8px;
+
+  --perf-w: 15px; // width of a sprocket strip
+
+  // ---- Type -----------------------------------------------------------
+  // One superfamily, sans and mono cut from the same drawing. IBM Plex was
+  // drawn for machines and instruments, which is the register this product
+  // is in, and its Cyrillic is designed rather than adapted — most of this
+  // interface is Russian. It also sits noticeably lighter on the page than
+  // the variable grotesque it replaces, which had to be pushed to 700-800
+  // before its labels read at all.
+  --font-ui: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+
+  --step: 4px;
+}

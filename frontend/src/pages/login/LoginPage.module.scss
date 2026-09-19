@@ -1,0 +1,129 @@
+@use '../../app/styles/bench' as bench;
+
+// The bench itself, before anything is on it: ruled deck, one lamp, the
+// vignette of a dark edit bay.
+.room {
+  position: relative;
+  height: 100%;
+  display: flex;
+  // The sheet is centred by auto margins rather than flex alignment: a
+  // centred flex item taller than its container gets its top clipped with no
+  // way to scroll to it, which is exactly what happened on a short window.
+  padding: 28px 20px;
+  overflow-y: auto;
+  background-color: var(--deck);
+  background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.028) 0 1px,
+      transparent 1px 24px
+    ),
+    repeating-linear-gradient(to bottom, rgba(216, 168, 81, 0.1) 0 1px, transparent 1px 192px),
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 24px);
+}
+
+.room::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      ellipse 62% 48% at 50% 34%,
+      rgba(216, 168, 81, 0.14),
+      transparent 72%
+    ),
+    radial-gradient(ellipse 110% 85% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.66) 100%);
+}
+
+// A camera report, taped to the deck.
+.sheet {
+  position: relative;
+  margin: auto;
+  width: 100%;
+  max-width: 424px;
+  background: var(--deck-lift);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--lift-panel);
+}
+
+.tapeTop {
+  top: -11px;
+  left: 50%;
+  margin-left: -58px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 18px 20px 14px;
+}
+
+.word {
+  font-family: var(--font-ui);
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.016em;
+  color: var(--room);
+}
+
+.srOnly {
+  @include bench.visually-hidden;
+}
+
+.pad {
+  padding: 8px 20px 22px;
+}
+
+// Two takes of the same scene. The active one is struck with the grease
+// pencil; the label says which, so the mark is not the only signal.
+.takes {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.take {
+  position: relative;
+  flex: 1;
+  height: 38px;
+  border: none;
+  background: transparent;
+  color: var(--room-faint);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  transition: color 140ms ease;
+
+  &:hover {
+    color: var(--room-dim);
+  }
+
+  &[aria-pressed='true'] {
+    color: var(--room);
+  }
+}
+
+.takeMark {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.submit {
+  width: 100%;
+  margin-top: 4px;
+}

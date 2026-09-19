@@ -1,0 +1,138 @@
+@use '../../app/styles/bench' as bench;
+
+// One form vocabulary for the whole product: a ruled row on a camera
+// report. Label above in slate lettering, value in a dark well, a rule
+// under it that the grease pencil takes over on focus.
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  @include bench.slate(10.5px, 600);
+  color: var(--room-faint);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.optional {
+  @include bench.mono-data(9.5px);
+  color: var(--room-faint);
+  letter-spacing: 0.1em;
+  text-transform: none;
+}
+
+.control {
+  width: 100%;
+  min-width: 0;
+  background: var(--deck-raised);
+  color: var(--room);
+  border: 1px solid var(--rule);
+  border-bottom-color: var(--rule-strong);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  font-size: 14.5px;
+  font-family: var(--font-ui);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+
+  &::placeholder {
+    color: var(--room-faint);
+  }
+
+  &:hover:not(:disabled):not(:focus) {
+    border-color: var(--rule-strong);
+    background: color-mix(in srgb, var(--deck-raised) 85%, var(--room) 15%);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--rule-strong);
+    border-bottom-color: var(--accent);
+    box-shadow: 0 1px 0 var(--accent);
+    background: color-mix(in srgb, var(--deck-raised) 78%, var(--room) 22%);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.input {
+  height: 46px;
+  padding: 0 13px;
+}
+
+// Dates and other measured values are read as data, not as prose.
+.numeric {
+  @include bench.mono-data(13.5px);
+  font-weight: 400;
+  color: var(--room);
+}
+
+.textarea {
+  padding: 11px 13px;
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 84px;
+}
+
+.select {
+  height: 46px;
+  padding: 0 34px 0 13px;
+  appearance: none;
+  cursor: pointer;
+  // The chevron is drawn, not a glyph — one stroke weight with the icon set.
+  background-image: linear-gradient(
+      45deg,
+      transparent 50%,
+      var(--room-dim) 50%,
+      var(--room-dim) calc(50% + 1.4px),
+      transparent calc(50% + 1.4px)
+    ),
+    linear-gradient(
+      -45deg,
+      transparent 50%,
+      var(--room-dim) 50%,
+      var(--room-dim) calc(50% + 1.4px),
+      transparent calc(50% + 1.4px)
+    );
+  background-size: 7px 7px, 7px 7px;
+  background-position: right 18px center, right 12px center;
+  background-repeat: no-repeat;
+}
+
+.hasError {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--rule));
+  border-bottom-color: var(--danger);
+
+  &:focus {
+    border-bottom-color: var(--danger);
+    box-shadow: 0 1px 0 var(--danger);
+  }
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--danger);
+
+  // A grease-pencil slash, so the message is not carried by colour alone.
+  &::before {
+    content: '';
+    width: 9px;
+    height: 9px;
+    flex: none;
+    background: currentColor;
+    clip-path: polygon(14% 0, 100% 78%, 86% 100%, 0 22%);
+  }
+}
+
+.hint {
+  font-size: 12.5px;
+  color: var(--room-faint);
+}

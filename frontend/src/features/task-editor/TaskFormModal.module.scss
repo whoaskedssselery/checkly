@@ -1,0 +1,115 @@
+@use '../../app/styles/bench' as bench;
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(6, 8, 9, 0.72);
+  backdrop-filter: blur(3px) saturate(0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+// The log sheet: a working document laid on the bench and taped down at
+// two corners, not a floating card.
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+  background: var(--deck-lift);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--lift-panel);
+}
+
+.tapeTl {
+  top: -11px;
+  left: -20px;
+}
+
+.tapeBr {
+  bottom: -11px;
+  right: -20px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 16px 14px 18px;
+  border-bottom: 1px solid var(--rule);
+  flex: none;
+}
+
+.title {
+  font-family: var(--font-ui);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  color: var(--room);
+  margin: 0;
+}
+
+.close {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--room-faint);
+  cursor: pointer;
+  transition: background-color 130ms ease, color 130ms ease, border-color 130ms ease;
+
+  &:hover {
+    background: var(--deck-raised);
+    border-color: var(--rule-strong);
+    color: var(--room);
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-top: 1px solid var(--rule);
+  background: var(--deck-raised);
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  flex: none;
+}
+
+.footRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 560px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

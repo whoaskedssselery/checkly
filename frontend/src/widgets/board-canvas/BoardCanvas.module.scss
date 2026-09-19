@@ -1,0 +1,207 @@
+@use '../../app/styles/bench' as bench;
+
+.canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--deck);
+  isolation: isolate;
+}
+
+.flow {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+// The lamp over the bench. It does not pan with the deck, because a lamp
+// does not move when you push the work around under it.
+.flow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      ellipse 70% 55% at 50% 38%,
+      rgba(216, 168, 81, 0.11),
+      transparent 70%
+    ),
+    radial-gradient(ellipse 120% 90% at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.flow :global(.react-flow__attribution) {
+  display: none;
+}
+
+// The zoom cluster owns the zoom number. It used to live in a status strip
+// across the bottom of the screen next to two counts you could get by
+// looking at the board — three label-and-value pairs in tracked caps, which
+// is a readout of nothing. Canvas tools put the percentage on the zoom
+// control; so does this one now, and the strip is gone.
+.flow :global(.react-flow__controls) {
+  left: 16px;
+  bottom: 16px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--rule-strong);
+  box-shadow: var(--lift-panel);
+  background: var(--deck-lift);
+}
+
+.flow :global(.react-flow__controls-button) {
+  width: 44px;
+  height: 44px;
+  background: var(--deck-lift);
+  border-bottom: 1px solid var(--rule);
+  color: var(--room-dim);
+  transition: background-color 130ms ease, color 130ms ease;
+
+  &:hover {
+    background: var(--deck-raised);
+    color: var(--accent);
+  }
+
+  svg {
+    width: 15px;
+    height: 15px;
+    max-width: 15px;
+    max-height: 15px;
+    fill: currentColor;
+  }
+}
+
+.zoomValue {
+  display: grid;
+  place-items: center;
+  height: 38px;
+  padding: 0 6px;
+  border-top: 1px solid var(--rule);
+  @include bench.mono-data(11.5px);
+  color: var(--room-dim);
+  user-select: none;
+}
+
+// ---- A bin on the deck -------------------------------------------------
+// Not a panel and not a plaque. A bin is a region of bench marked off with
+// gate brackets in the reel's own colour, and its name is written along the
+// top of that region — no box around the label, no colour swatch, no code
+// chip, no tape. The header was a dark pill holding four micro-elements
+// inside an outline that already existed, which is the most generated thing
+// on the board. Tape is for objects you can pick up; a marked-off area is
+// not one, so the bins do not get any.
+.bin {
+  position: relative;
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006));
+  overflow: visible;
+  transition: background-color 160ms ease;
+}
+
+// The region is defined by four marks in the reel's colour and nothing
+// else. A dashed spine used to run down the left as a second colour cue;
+// sitting outside the frame it read as a divider between columns rather
+// than as part of one, and the marks already say whose region this is.
+.gate {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.8;
+  @include bench.frame-marks(var(--reel-color, var(--rule-strong)), 24px, 2px);
+}
+
+// The name captions the region from outside it. Inside, it collided with the
+// top-left registration mark — the bracket ran straight into the first
+// letter and read as a glitch — and it was separated from its own count by a
+// rule spanning half the column, which is the label-dash-value template, not
+// a heading. Now it sits above the marked area, aligned to its left edge,
+// with the count right beside it where it belongs.
+.binHead {
+  position: absolute;
+  left: 1px;
+  bottom: 100%;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+  max-width: 100%;
+}
+
+.binName {
+  font-family: var(--font-ui);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  color: var(--room);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.binCount {
+  @include bench.mono-data(13px);
+  color: var(--room-faint);
+  flex: none;
+}
+
+// Removing a bin is rare and destructive, so its control does not sit on
+// screen at all times competing with the name.
+.binTool {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--room-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease, background-color 130ms ease, color 130ms ease;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 20%, transparent);
+    color: var(--danger);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.bin:hover .binTool,
+.bin:focus-within .binTool {
+  opacity: 1;
+
+  &:disabled {
+    opacity: 0.35;
+  }
+}
+
+// An empty bin teaches what a bin is for, instead of saying "nothing here".
+.empty {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--room-faint);
+}
+
+.emptyGate {
+  display: block;
+  width: 52px;
+  height: 34px;
+  margin: 0 auto 12px;
+  border: 1.5px dashed var(--rule-strong);
+  border-radius: var(--r-sm);
+}

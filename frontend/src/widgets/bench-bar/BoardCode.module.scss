@@ -1,0 +1,55 @@
+@use '../../app/styles/bench' as bench;
+
+// The one thing you hand to someone so they can join. It is a control, not a
+// caption: pressing it copies the code, because "how do I invite the other
+// two" is the question a shared board has to answer without a settings page.
+.code {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 34px;
+  padding: 0 11px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--deck-sunken);
+  color: var(--room-dim);
+  cursor: pointer;
+  flex: none;
+  transition: background-color 130ms ease, color 130ms ease;
+
+  // Matches the bar it sits in: taller when the window has the room.
+  @media (min-height: 760px) {
+    height: 40px;
+    padding: 0 14px;
+  }
+
+  &:hover {
+    background: var(--deck-raised);
+    color: var(--room);
+  }
+}
+
+.value {
+  @include bench.mono-data(12px);
+  letter-spacing: 0.1em;
+}
+
+.icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--room-faint);
+}
+
+.copied {
+  color: var(--ok);
+
+  .icon {
+    color: var(--ok);
+  }
+}
+
+.hint {
+  @include bench.mono-data(10.5px);
+  color: currentColor;
+}

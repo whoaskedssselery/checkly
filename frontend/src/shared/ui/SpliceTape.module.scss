@@ -1,0 +1,13 @@
+@use '../../app/styles/bench' as bench;
+
+// A strip of splice tape. Amber, translucent, its own perforations punched
+// through it, cut square at both ends the way real splice tape is.
+.tape {
+  position: absolute;
+  pointer-events: none;
+  width: var(--tape-len, 88px);
+  height: var(--tape-thick, 20px);
+  transform: rotate(var(--tape-angle, 0deg));
+  transform-origin: center;
+  @include bench.splice-tape;
+}

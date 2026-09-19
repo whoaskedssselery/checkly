@@ -1,0 +1,74 @@
+@use '../../app/styles/bench' as bench;
+
+// One avatar for the whole product. It was three before — a bordered chip in
+// the bar, a filled square for you, a perforated film frame on the profile —
+// and three treatments of the same object is how an interface stops looking
+// like one thing. A filled disc with an initial is the boring, universally
+// read answer, and boring is correct here: the outlined-chip-with-a-glow
+// version was the part that looked generated.
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  // Every disc is the same recipe: the person's colour pressed down until a
+  // white initial sits on it at 4.5:1 or better. The bright colour still
+  // identifies them on the deck — it is their cursor and their reel dot —
+  // but a light fill forces the letter to go black, and black type in a
+  // coloured circle reads as a warning sticker, not as a person.
+  background: var(--avatar-color, var(--accent-solid));
+  color: var(--accent-ink);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+  // A single top-lit highlight, the way a solid object under the bench lamp
+  // actually catches light. No ring, no halo.
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.xs {
+  width: 17px;
+  height: 17px;
+  font-size: 9px;
+}
+
+.sm {
+  width: 26px;
+  height: 26px;
+  font-size: 11.5px;
+}
+
+.md {
+  width: 30px;
+  height: 30px;
+  font-size: 13px;
+}
+
+.lg {
+  width: 60px;
+  height: 60px;
+  font-size: 24px;
+}
+
+.xl {
+  width: 88px;
+  height: 88px;
+  font-size: 34px;
+}
+
+// Overlapping stack of the people on the board. The cut between neighbours
+// is the deck showing through, not a decorative outline.
+.stack {
+  display: flex;
+  align-items: center;
+
+  .avatar + .avatar,
+  > * + * {
+    margin-left: -7px;
+  }
+
+  .avatar {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 0 2px var(--stack-gap, var(--deck-lift));
+  }
+}

@@ -1,0 +1,108 @@
+// Shared grammar of the editing-bench world. Every surface that is taped,
+// perforated, slate-lettered or focusable pulls from here, so the same
+// tape is the same tape everywhere instead of four near-misses.
+
+// Small functional labels — a field's name, a column heading in a table of
+// facts. Uppercase and tracked so they scan at 10px, but no longer squeezed
+// to 72% width and no longer set at 700: the condensed heavy caps were
+// everywhere, and everywhere-caps is a texture, not a hierarchy. Headings,
+// buttons and names are set in normal case now; this is only for labels.
+@mixin slate($size: 10.5px, $weight: 600) {
+  font-family: var(--font-ui);
+  font-size: $size;
+  font-weight: $weight;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+// Measurement type: edge codes, counters, coordinates, dates. Tabular so
+// numbers never jitter as they tick.
+@mixin mono-data($size: 11px) {
+  font-family: var(--font-mono);
+  font-size: $size;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+// The sprocket edge of a strip of film. $hole is whatever shows through
+// the perforations — the deck under a clip, the panel under a sheet.
+// Deliberately quiet: at card scale a high-contrast hole pattern reads as
+// dirt, so the holes sit just below the edge's own value and the edge
+// carries a highlight to keep it reading as film stock.
+@mixin perf-strip($hole: var(--deck)) {
+  width: var(--perf-w);
+  background-color: var(--frame-edge-lit);
+  background-image: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.18),
+      rgba(255, 255, 255, 0.5) 40%,
+      rgba(0, 0, 0, 0.1)
+    ),
+    radial-gradient(ellipse 3.2px 4.6px at 50% 11px, $hole 97%, transparent 100%);
+  background-size: 100% 100%, 100% 22px;
+  background-repeat: no-repeat, repeat-y;
+}
+
+// Splice tape. The first two attempts painted a khaki rectangle and called
+// it tape; the thing that makes tape read as tape is not its colour, it is
+// that you can see through it. So almost all of this is transparent: the
+// strip brightens and warms whatever lies under it, and what you actually
+// see are the two cut edges catching the light and one sheen running down
+// the middle. Over the dark deck it glows; over a lit frame it tints. Same
+// strip, both readings, because that is how a translucent film behaves.
+@mixin splice-tape {
+  background-image: linear-gradient(
+      100deg,
+      transparent 6%,
+      rgba(255, 246, 222, 0.16) 22%,
+      rgba(255, 250, 235, 0.3) 34%,
+      transparent 52%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 247, 226, 0.34) 0 1.5px,
+      rgba(255, 236, 198, 0.1) 1.5px 28%,
+      rgba(214, 160, 78, 0.07) 28% 74%,
+      rgba(120, 80, 26, 0.16) 74% calc(100% - 1.5px),
+      rgba(255, 243, 214, 0.26) calc(100% - 1.5px) 100%
+    );
+  background-repeat: no-repeat;
+  backdrop-filter: saturate(1.75) brightness(1.22) blur(0.4px);
+  box-shadow: inset 0 1px 0 rgba(255, 249, 232, 0.7),
+    inset 0 -1px 0 rgba(58, 36, 8, 0.45), 0 1px 3px -1px rgba(0, 0, 0, 0.4);
+}
+
+// Registration marks on all four corners — the gate brackets that frame a
+// measured area. Two corners read as a stray mark; four read as a frame.
+@mixin frame-marks($color: var(--rule-strong), $len: 22px, $w: 2px) {
+  background-image: linear-gradient($color, $color), linear-gradient($color, $color),
+    linear-gradient($color, $color), linear-gradient($color, $color),
+    linear-gradient($color, $color), linear-gradient($color, $color),
+    linear-gradient($color, $color), linear-gradient($color, $color);
+  background-size: $len $w, $w $len, $len $w, $w $len, $len $w, $w $len, $len $w, $w $len;
+  background-position: left top, left top, right top, right top, left bottom, left bottom,
+    right bottom, right bottom;
+  background-repeat: no-repeat;
+}
+
+@mixin focus-ring {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+// Present for screen readers, absent for eyes. Used where a control group
+// is obvious by shape and a visible caption would only add chrome.
+@mixin visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

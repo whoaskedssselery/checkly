@@ -1,0 +1,179 @@
+@use '../../app/styles/bench' as bench;
+
+// The profile was a 468px card holding six pieces of 10px type, adrift in a
+// very large dark room. Everything about it was correct and nothing about it
+// was worth looking at. This version is built at the scale of the thing it is
+// about: one person, named large, with the three facts the app actually knows
+// underneath and exactly one action.
+.room {
+  position: relative;
+  height: 100%;
+  display: flex;
+  padding: 40px 24px;
+  overflow-y: auto;
+  background-color: var(--deck);
+  background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.028) 0 1px,
+      transparent 1px 24px
+    ),
+    repeating-linear-gradient(to bottom, rgba(216, 168, 81, 0.1) 0 1px, transparent 1px 192px),
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 24px);
+}
+
+.room::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      ellipse 62% 48% at 50% 34%,
+      rgba(216, 168, 81, 0.12),
+      transparent 72%
+    ),
+    radial-gradient(ellipse 110% 85% at 50% 50%, transparent 42%, rgba(0, 0, 0, 0.62) 100%);
+}
+
+.stage {
+  position: relative;
+  margin: auto;
+  width: 100%;
+  max-width: 620px;
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  padding: 38px 38px 30px;
+  background: var(--deck-lift);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--lift-panel);
+}
+
+// Leaving this screen, drawn the same way every other icon-only exit in the
+// product is: the modal's close control and a bin's delete control. Sitting
+// in the card's own top-right corner rather than floating above it as a text
+// link ties the action to the thing it acts on.
+.back {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--room-faint);
+  cursor: pointer;
+  transition: background-color 130ms ease, color 130ms ease, border-color 130ms ease;
+
+  &:hover {
+    background: var(--deck-raised);
+    border-color: var(--rule-strong);
+    color: var(--room);
+  }
+}
+
+.tapeTop {
+  top: -11px;
+  right: 46px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.who {
+  min-width: 0;
+}
+
+// A person's name, set as a name. Tracked uppercase here would have been the
+// same mistake the header was making: treating a human being as a label.
+.name {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.1;
+  color: var(--room);
+  margin: 0 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email {
+  @include bench.mono-data(14px);
+  font-weight: 400;
+  color: var(--room-dim);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.facts {
+  display: flex;
+  gap: 52px;
+  margin: 32px 0 0;
+  padding: 26px 0 0;
+  border-top: 1px solid var(--rule);
+}
+
+.factKey {
+  display: block;
+  @include bench.slate(10px, 600);
+  color: var(--room-faint);
+  margin: 0 0 9px;
+}
+
+// Sans, not the mono measurement face: mono is for footage the board
+// actually ticks — an edge code, a timestamp, the zoom percentage — not for
+// three static facts read once on a screen you visit rarely. tabular-nums
+// still comes from the shared [data-numeric] rule, so the digits still line
+// up; only the typewriter voice is gone.
+.factVal {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--room);
+  margin: 0;
+}
+
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 30px;
+  padding-top: 22px;
+  border-top: 1px solid var(--rule);
+}
+
+.logout {
+  flex: none;
+}
+
+@media (max-width: 620px) {
+  .card {
+    padding: 28px 22px 24px;
+  }
+
+  .head {
+    gap: 18px;
+  }
+
+  .name {
+    font-size: 26px;
+  }
+
+  .facts {
+    gap: 28px;
+    flex-wrap: wrap;
+  }
+}
