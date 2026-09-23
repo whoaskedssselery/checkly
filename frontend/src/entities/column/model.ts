@@ -10,10 +10,121 @@ export interface Column {
   name: string
   color: string
   position: { x: number; y: number }
+  /** Set by dragging the column's bottom edge; undefined = standard height. */
+  height?: number
+  /** Set by dragging a side edge; undefined = standard width. */
+  width?: number
 }
 
 export const COLUMN_WIDTH = 300
 export const COLUMN_HEIGHT = 470
+/** Smallest a column can be made by hand. */
+export const MIN_COLUMN_HEIGHT = 240
+/** Narrowest a column can be made: a card (250) plus its margins. */
+export const MIN_COLUMN_WIDTH = 290
+
+export type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+export interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * The column's rectangle after dragging one of its edges/corners by (dx, dy)
+ * canvas units. Dragging the left or top edge moves the column's origin so the
+ * opposite edge stays put; nothing goes below the minimum size.
+ */
+export function resizeRect(dir: ResizeDir, start: Rect, dx: number, dy: number): Rect {
+  let { x, y, width, height } = start
+  if (dir.includes('e')) width = Math.max(MIN_COLUMN_WIDTH, start.width + dx)
+  if (dir.includes('w')) {
+    width = Math.max(MIN_COLUMN_WIDTH, start.width - dx)
+    x = start.x + (start.width - width)
+  }
+  if (dir.includes('s')) height = Math.max(MIN_COLUMN_HEIGHT, start.height + dy)
+  if (dir.includes('n')) {
+    height = Math.max(MIN_COLUMN_HEIGHT, start.height - dy)
+    y = start.y + (start.height - height)
+  }
+  return { x, y, width, height }
+}
+
+/** Empty space kept between two columns so they never touch. */
+export const COLUMN_GAP = 8
+
+export interface PlacedColumn extends Rect {
+  id: string
+}
+
+/** Do two columns overlap, or come closer than the gap? */
+export function columnsOverlap(a: Rect, b: Rect, gap = COLUMN_GAP): boolean {
+  return (
+    a.x < b.x + b.width + gap &&
+    b.x < a.x + a.width + gap &&
+    a.y < b.y + b.height + gap &&
+    b.y < a.y + a.height + gap
+  )
+}
+
+/** Where every column is and how big it is drawn (including growth from its cards). */
+export function columnRects(
+  columns: { id: string; position: { x: number; y: number }; width?: number; height?: number }[],
+  tasks: { columnId: string | null; position: { x: number; y: number } }[],
+): PlacedColumn[] {
+  return columns.map((c) => ({
+    id: c.id,
+    x: c.position.x,
+    y: c.position.y,
+    width: columnWidth(c),
+    height: columnHeight(c, tasks),
+  }))
+}
+
+/**
+ * Stop a column at its neighbours. Given where the column is (`current`) and
+ * where the pointer wants it (`proposed`), returns the furthest point along
+ * that path that does not run into another column. A column that already
+ * overlaps something (older data) is left unconstrained rather than frozen.
+ */
+export function limitToFreeSpace(current: Rect, proposed: Rect, others: Rect[]): Rect {
+  const blocked = (r: Rect) => others.some((o) => columnsOverlap(r, o))
+  if (blocked(current) || !blocked(proposed)) return proposed
+  const at = (t: number): Rect => ({
+    x: current.x + (proposed.x - current.x) * t,
+    y: current.y + (proposed.y - current.y) * t,
+    width: current.width + (proposed.width - current.width) * t,
+    height: current.height + (proposed.height - current.height) * t,
+  })
+  let free = 0
+  let hit = 1
+  for (let i = 0; i < 24; i++) {
+    const mid = (free + hit) / 2
+    if (blocked(at(mid))) hit = mid
+    else free = mid
+  }
+  return at(free)
+}
+
+/** A spot for a new column: to the right of the rightmost one, on the top row. */
+export function nextColumnPosition(
+  columns: { position: { x: number; y: number }; width?: number }[],
+): { x: number; y: number } {
+  if (columns.length === 0) return { x: 20, y: 0 }
+  return {
+    x: Math.max(...columns.map((c) => c.position.x + columnWidth(c))) + 20,
+    y: Math.min(...columns.map((c) => c.position.y)),
+  }
+}
+
+export const columnWidth = (column: { width?: number }): number => column.width ?? COLUMN_WIDTH
+/**
+ * How far below a column's bottom edge a dropped card still counts as being in
+ * it. This is what lets a card be dragged down to make its column grow: the
+ * card joins, and the column then stretches to hold it.
+ */
+const DROP_ALLOWANCE = 90
 
 /** Empty room kept under the lowest card of a column. */
 const COLUMN_BOTTOM_PADDING = 36
@@ -24,18 +135,21 @@ const COLUMN_BOTTOM_PADDING = 36
  * shrinks back when they leave.
  */
 export function columnHeight(
-  column: { id: string; position: { x: number; y: number } },
+  column: { id: string; position: { x: number; y: number }; height?: number },
   tasks: { columnId: string | null; position: { x: number; y: number } }[],
 ): number {
   let bottom = 0
   for (const t of tasks) {
     if (t.columnId === column.id) bottom = Math.max(bottom, t.position.y + CARD_HEIGHT)
   }
-  return Math.max(COLUMN_HEIGHT, bottom - column.position.y + COLUMN_BOTTOM_PADDING)
+  return Math.max(
+    column.height ?? COLUMN_HEIGHT,
+    bottom - column.position.y + COLUMN_BOTTOM_PADDING,
+  )
 }
 
 export function columnHeights(
-  columns: { id: string; position: { x: number; y: number } }[],
+  columns: { id: string; position: { x: number; y: number }; height?: number }[],
   tasks: { columnId: string | null; position: { x: number; y: number } }[],
 ): Record<string, number> {
   return Object.fromEntries(columns.map((c) => [c.id, columnHeight(c, tasks)]))
@@ -50,7 +164,7 @@ export function columnHeights(
  */
 export function columnAtCard(
   cardPosition: { x: number; y: number },
-  columns: { id: string; position: { x: number; y: number } }[],
+  columns: { id: string; position: { x: number; y: number }; height?: number; width?: number }[],
   heights: Record<string, number> = {},
 ): string | undefined {
   const cx = cardPosition.x + CARD_WIDTH / 2
@@ -58,9 +172,9 @@ export function columnAtCard(
   return columns.find(
     (c) =>
       cx >= c.position.x &&
-      cx <= c.position.x + COLUMN_WIDTH &&
+      cx <= c.position.x + columnWidth(c) &&
       cy >= c.position.y &&
-      cy <= c.position.y + (heights[c.id] ?? COLUMN_HEIGHT),
+      cy <= c.position.y + (heights[c.id] ?? c.height ?? COLUMN_HEIGHT) + DROP_ALLOWANCE,
   )?.id
 }
 
@@ -101,6 +215,10 @@ interface ColumnState {
   moveColumnPosition: (id: string, position: { x: number; y: number }) => void
   /** Write a column's current position to the server (drag end). */
   commitColumn: (id: string) => Promise<void>
+  /** Local-only, called while an edge is being dragged. Persist with `commitColumnSize`. */
+  resizeColumn: (id: string, rect: Rect) => void
+  /** Save the column's position and size (resize end). */
+  commitColumnSize: (id: string) => Promise<void>
 }
 
 export const useColumnStore = create<ColumnState>((set, get) => ({
@@ -110,13 +228,11 @@ export const useColumnStore = create<ColumnState>((set, get) => ({
 
   addColumn: (name) => {
     const columns = get().columns
-    // Cascade new columns so they don't all land in the exact same spot.
-    const offset = columns.length * 36
     const column: Column = {
       id: `tmp-${crypto.randomUUID()}`,
       name: name?.trim() || `Колонка ${columns.length + 1}`,
       color: palette[columns.length % palette.length],
-      position: { x: 60 + offset, y: 480 + offset },
+      position: nextColumnPosition(columns),
     }
     set({ columns: [...columns, column] })
 
@@ -167,6 +283,34 @@ export const useColumnStore = create<ColumnState>((set, get) => ({
     set((state) => ({
       columns: state.columns.map((c) => (c.id === id ? { ...c, position } : c)),
     })),
+
+  resizeColumn: (id, rect) =>
+    set((state) => ({
+      columns: state.columns.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              position: { x: rect.x, y: rect.y },
+              width: Math.max(MIN_COLUMN_WIDTH, Math.round(rect.width)),
+              height: Math.max(MIN_COLUMN_HEIGHT, Math.round(rect.height)),
+            }
+          : c,
+      ),
+    })),
+
+  commitColumnSize: async (id) => {
+    const column = get().columns.find((c) => c.id === id)
+    if (!column) return
+    const serverId = await realId(id)
+    if (!serverId) return
+    await track(
+      api.columns.update(serverId, {
+        position: column.position,
+        ...(column.width !== undefined && { width: column.width }),
+        ...(column.height !== undefined && { height: column.height }),
+      }),
+    )
+  },
 
   commitColumn: async (id) => {
     const column = get().columns.find((c) => c.id === id)

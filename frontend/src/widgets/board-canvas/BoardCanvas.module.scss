@@ -97,9 +97,10 @@
   border-radius: var(--r-lg);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006));
   overflow: visible;
-  // A column grows and shrinks with its cards; ease it so it reads as room
-  // being made, not a jump.
-  transition: background-color 160ms ease, height 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  // No size transition on purpose: the column is resized by hand and by its
+  // cards, and easing width/height would lag behind the pointer (and animate a
+  // layout property).
+  transition: background-color 160ms ease;
 }
 
 // The region is defined by four marks in the reel's colour and nothing
@@ -220,4 +221,103 @@
 .flow :global(.react-flow__node-presence) {
   transition: transform 90ms linear;
   pointer-events: none;
+}
+
+// The edges and corners of a column: drag any of them to stretch the column
+// in that direction. Invisible until you reach for them, then they show in the
+// column's own colour. Edges sit half outside the frame so they do not fight
+// with the cards inside it.
+.resize {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+
+  &::after {
+    content: '';
+    border-radius: 2px;
+    background: var(--reel-color, var(--rule-strong));
+    opacity: 0;
+    transition: opacity 140ms ease;
+  }
+
+  &:hover::after,
+  &:focus-visible::after {
+    opacity: 0.9;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    border-radius: var(--r-sm);
+  }
+
+  // top / bottom edges
+  &[data-dir='n'],
+  &[data-dir='s'] {
+    left: 18px;
+    right: 18px;
+    height: 18px;
+
+    &::after {
+      width: 48px;
+      height: 3px;
+    }
+  }
+  &[data-dir='n'] {
+    top: -9px;
+  }
+  &[data-dir='s'] {
+    bottom: -9px;
+  }
+
+  // left / right edges
+  &[data-dir='w'],
+  &[data-dir='e'] {
+    top: 18px;
+    bottom: 18px;
+    width: 18px;
+
+    &::after {
+      width: 3px;
+      height: 48px;
+    }
+  }
+  &[data-dir='w'] {
+    left: -9px;
+  }
+  &[data-dir='e'] {
+    right: -9px;
+  }
+
+  // corners
+  &[data-dir='nw'],
+  &[data-dir='ne'],
+  &[data-dir='sw'],
+  &[data-dir='se'] {
+    width: 22px;
+    height: 22px;
+
+    &::after {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+  }
+  &[data-dir='nw'] {
+    top: -11px;
+    left: -11px;
+  }
+  &[data-dir='ne'] {
+    top: -11px;
+    right: -11px;
+  }
+  &[data-dir='sw'] {
+    bottom: -11px;
+    left: -11px;
+  }
+  &[data-dir='se'] {
+    bottom: -11px;
+    right: -11px;
+  }
 }

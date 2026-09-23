@@ -31,6 +31,10 @@ export interface ColumnDto {
   name: string
   color: string
   position: Point
+  /** Height the user gave it by hand; absent = the standard height. Cards can make it taller. */
+  height?: number
+  /** Width the user gave it by hand; absent = the standard width. */
+  width?: number
 }
 
 export interface TaskDto {
@@ -63,7 +67,7 @@ export interface BoardDto {
 }
 
 export type ColumnCreate = Pick<ColumnDto, 'name' | 'color' | 'position'>
-export type ColumnPatch = Partial<ColumnCreate>
+export type ColumnPatch = Partial<ColumnCreate> & { height?: number; width?: number }
 
 export type TaskCreate = Pick<
   TaskDto,

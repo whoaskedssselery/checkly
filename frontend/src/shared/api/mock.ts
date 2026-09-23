@@ -445,6 +445,16 @@ export const mockApi: CheckllyApi = {
         invalid({ name: 'Name is required' })
       if (patch.position !== undefined && !isPoint(patch.position))
         invalid({ position: 'Position must be {x, y} numbers' })
+      if (
+        patch.height !== undefined &&
+        !(Number.isFinite(patch.height) && patch.height >= 120 && patch.height <= 5000)
+      )
+        invalid({ height: 'Height must be between 120 and 5000' })
+      if (
+        patch.width !== undefined &&
+        !(Number.isFinite(patch.width) && patch.width >= 200 && patch.width <= 5000)
+      )
+        invalid({ width: 'Width must be between 200 and 5000' })
       Object.assign(column, patch)
       save(db)
       return column
