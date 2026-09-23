@@ -1,5 +1,11 @@
 import { useColumnStore } from '@entities/column/model'
-import { type Task, type TaskPriority, useTaskStore } from '@entities/task/model'
+import {
+  freeSpotPosition,
+  nextTaskPosition,
+  type Task,
+  type TaskPriority,
+  useTaskStore,
+} from '@entities/task/model'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useFocusTrap } from '@shared/lib/useFocusTrap'
 import { Button } from '@shared/ui/Button'
@@ -13,9 +19,10 @@ import { z } from 'zod'
 import styles from './TaskFormModal.module.scss'
 
 const schema = z.object({
-  title: z.string().min(1, 'Укажите название'),
+  title: z.string().trim().min(1, 'Укажите название').max(255, 'Не длиннее 255 символов'),
   description: z.string().optional(),
-  columnId: z.string().min(1, 'Выберите колонку'),
+  // empty = "no column": a free-floating card
+  columnId: z.string(),
   priority: z.enum(['low', 'medium', 'high']),
   dueDate: z.string().optional(),
   tags: z.string().optional(),
@@ -57,7 +64,7 @@ export function TaskFormModal({ task, defaultColumnId, onClose }: TaskFormModalP
     defaultValues: {
       title: task?.title ?? '',
       description: task?.description ?? '',
-      columnId: task?.columnId ?? defaultColumnId ?? columns[0]?.id ?? '',
+      columnId: task ? (task.columnId ?? '') : (defaultColumnId ?? columns[0]?.id ?? ''),
       priority: task?.priority ?? 'medium',
       dueDate: task?.dueDate ?? '',
       tags: task?.tags.join(', ') ?? '',
@@ -74,19 +81,30 @@ export function TaskFormModal({ task, defaultColumnId, onClose }: TaskFormModalP
     const payload = {
       title: values.title,
       description: values.description || undefined,
-      columnId: values.columnId,
+      columnId: values.columnId || null,
       priority: values.priority as TaskPriority,
       dueDate: values.dueDate || undefined,
       tags,
     }
 
     if (task) {
-      updateTask(task.id, payload)
+      // Moving a card to another column in the form must move it on the board
+      // too: park it under the last card of the new column.
+      const newColumn = columns.find((c) => c.id === values.columnId)
+      const others = tasks.filter((t) => t.id !== task.id)
+      if ((values.columnId || null) !== task.columnId && newColumn) {
+        updateTask(task.id, { ...payload, position: nextTaskPosition(newColumn, others) })
+      } else if (!values.columnId && task.columnId !== null) {
+        // Taken out of its column: it has to actually leave it, not just lose
+        // the label while still sitting inside the column's area.
+        updateTask(task.id, { ...payload, position: freeSpotPosition(columns, others) })
+      } else {
+        updateTask(task.id, payload)
+      }
     } else {
-      const inColumn = tasks.filter((t) => t.columnId === values.columnId).length
       const targetColumn = columns.find((c) => c.id === values.columnId)
-      const base = targetColumn?.position ?? { x: 20, y: 0 }
-      createTask(payload, { x: base.x + 18, y: base.y + 72 + inColumn * 96 })
+      // With no column the card starts just above the columns, clear of them.
+      createTask(payload, targetColumn ? nextTaskPosition(targetColumn, tasks) : { x: 20, y: -170 })
     }
     onClose()
   }
@@ -140,6 +158,7 @@ export function TaskFormModal({ task, defaultColumnId, onClose }: TaskFormModalP
 
           <div className={styles.row}>
             <Select label="Колонка" error={errors.columnId?.message} {...register('columnId')}>
+              <option value="">Без колонки</option>
               {columns.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}

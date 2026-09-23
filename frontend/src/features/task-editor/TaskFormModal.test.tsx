@@ -1,3 +1,4 @@
+import { stubTaskWrites } from '@app/test-api'
 import { useColumnStore } from '@entities/column/model'
 import { type Task, useTaskStore } from '@entities/task/model'
 import { render, screen } from '@testing-library/react'
@@ -28,6 +29,7 @@ describe('TaskFormModal', () => {
   beforeEach(() => {
     useColumnStore.setState({ columns })
     useTaskStore.setState({ tasks: [existingTask] })
+    stubTaskWrites()
   })
 
   it('creates a task with the entered fields', async () => {
@@ -47,6 +49,26 @@ describe('TaskFormModal', () => {
       tags: ['design', 'urgent'],
     })
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a whitespace-only title (the server would refuse it too)', async () => {
+    render(<TaskFormModal onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Название'), '    ')
+    await userEvent.click(screen.getByRole('button', { name: 'Создать' }))
+
+    expect(await screen.findByText('Укажите название')).toBeInTheDocument()
+    expect(useTaskStore.getState().tasks).toHaveLength(1)
+  })
+
+  it('rejects a title over 255 characters', async () => {
+    render(<TaskFormModal onClose={vi.fn()} />)
+
+    await userEvent.click(screen.getByLabelText('Название'))
+    await userEvent.paste('x'.repeat(256))
+    await userEvent.click(screen.getByRole('button', { name: 'Создать' }))
+
+    expect(await screen.findByText('Не длиннее 255 символов')).toBeInTheDocument()
   })
 
   it('rejects an empty title without calling createTask', async () => {
@@ -93,5 +115,55 @@ describe('TaskFormModal', () => {
 
     expect(onClose).toHaveBeenCalledOnce()
     expect(useTaskStore.getState().tasks[0].title).toBe('Existing task')
+  })
+})
+
+describe('TaskFormModal: changing the column moves the card', () => {
+  beforeEach(() => {
+    useColumnStore.setState({ columns })
+    useTaskStore.setState({ tasks: [existingTask] })
+    stubTaskWrites()
+  })
+
+  it('puts the card into the new column area, not just relabels it', async () => {
+    render(<TaskFormModal task={existingTask} onClose={vi.fn()} />)
+
+    await userEvent.selectOptions(screen.getByLabelText('Колонка'), 'col-b')
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+
+    const moved = useTaskStore.getState().tasks[0]
+    expect(moved.columnId).toBe('col-b')
+    // column B starts at x=300, so the card must sit inside it (x 300..600)
+    expect(moved.position.x).toBeGreaterThanOrEqual(300)
+    expect(moved.position.x).toBeLessThan(600)
+  })
+
+  it('"Без колонки" takes the card out of the column area, not just off its label', async () => {
+    render(<TaskFormModal task={existingTask} onClose={vi.fn()} />)
+
+    await userEvent.selectOptions(screen.getByLabelText('Колонка'), '')
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+
+    const moved = useTaskStore.getState().tasks[0]
+    expect(moved.columnId).toBeNull()
+    // columns start at y=0; the free card must be clear of them (above the row)
+    expect(moved.position.y + 132).toBeLessThanOrEqual(0)
+  })
+
+  it('creates a card with no column', async () => {
+    render(<TaskFormModal onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Название'), 'Свободная')
+    await userEvent.selectOptions(screen.getByLabelText('Колонка'), '')
+    await userEvent.click(screen.getByRole('button', { name: 'Создать' }))
+
+    const created = useTaskStore.getState().tasks.find((t) => t.title === 'Свободная')
+    expect(created?.columnId).toBeNull()
+  })
+
+  it('keeps the position when the column is not changed', async () => {
+    render(<TaskFormModal task={existingTask} onClose={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+    expect(useTaskStore.getState().tasks[0].position).toEqual({ x: 20, y: 20 })
   })
 })

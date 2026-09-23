@@ -1,6 +1,7 @@
 import { useUserStore } from '@entities/user/model'
+import { DEMO_EMAIL, DEMO_PASSWORD, resetMockDb } from '@shared/api/mock'
 import { useUiStore } from '@shared/lib/useUiStore'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { LoginPage } from './LoginPage'
@@ -8,7 +9,8 @@ import { LoginPage } from './LoginPage'
 describe('LoginPage', () => {
   beforeEach(() => {
     localStorage.clear()
-    useUserStore.setState({ user: null })
+    resetMockDb()
+    useUserStore.setState({ user: null, error: null })
     useUiStore.setState({ screen: 'login' })
   })
 
@@ -50,11 +52,46 @@ describe('LoginPage', () => {
   it('logs in and switches to the board screen on valid submit', async () => {
     render(<LoginPage />)
 
-    await userEvent.type(screen.getByLabelText('Email'), 'korzhnev@checkly.dev')
-    await userEvent.type(screen.getByLabelText('Пароль'), 'password123')
+    await userEvent.type(screen.getByLabelText('Email'), DEMO_EMAIL)
+    await userEvent.type(screen.getByLabelText('Пароль'), DEMO_PASSWORD)
     await userEvent.click(screen.getByRole('button', { name: 'Войти' }))
 
-    expect(useUserStore.getState().user?.email).toBe('korzhnev@checkly.dev')
-    expect(useUiStore.getState().screen).toBe('board')
+    await waitFor(() => expect(useUiStore.getState().screen).toBe('board'))
+    expect(useUserStore.getState().user?.email).toBe(DEMO_EMAIL)
+  })
+
+  it('shows the server error and stays on the form for a wrong password', async () => {
+    render(<LoginPage />)
+
+    await userEvent.type(screen.getByLabelText('Email'), DEMO_EMAIL)
+    await userEvent.type(screen.getByLabelText('Пароль'), 'wrong-password')
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Неверный email или пароль')
+    expect(useUiStore.getState().screen).toBe('login')
+  })
+
+  it('registers a new account from the registration tab', async () => {
+    render(<LoginPage />)
+    await userEvent.click(screen.getByRole('button', { name: 'Регистрация' }))
+
+    await userEvent.type(screen.getByLabelText('Имя'), 'Новый')
+    await userEvent.type(screen.getByLabelText('Email'), 'new@checkly.dev')
+    await userEvent.type(screen.getByLabelText('Пароль'), 'secret12')
+    await userEvent.click(screen.getByRole('button', { name: 'Зарегистрироваться' }))
+
+    await waitFor(() => expect(useUiStore.getState().screen).toBe('board'))
+    expect(useUserStore.getState().user).toMatchObject({ name: 'Новый', email: 'new@checkly.dev' })
+  })
+
+  it('reports an already-registered email on the registration tab', async () => {
+    render(<LoginPage />)
+    await userEvent.click(screen.getByRole('button', { name: 'Регистрация' }))
+
+    await userEvent.type(screen.getByLabelText('Email'), DEMO_EMAIL)
+    await userEvent.type(screen.getByLabelText('Пароль'), 'secret12')
+    await userEvent.click(screen.getByRole('button', { name: 'Зарегистрироваться' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Этот email уже зарегистрирован')
   })
 })

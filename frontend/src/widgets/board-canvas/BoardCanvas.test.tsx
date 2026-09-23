@@ -1,3 +1,4 @@
+import { stubColumnWrites, stubTaskWrites } from '@app/test-api'
 import { useColumnStore } from '@entities/column/model'
 import { useTaskStore } from '@entities/task/model'
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -31,6 +32,8 @@ const tasks = [
 describe('BoardCanvas', () => {
   beforeEach(() => {
     useColumnStore.setState({ columns })
+    stubColumnWrites()
+    stubTaskWrites()
     useTaskStore.setState({ tasks })
   })
 

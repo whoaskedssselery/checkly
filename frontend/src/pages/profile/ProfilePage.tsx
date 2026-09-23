@@ -1,6 +1,8 @@
+import { useBoardStore } from '@entities/board/model'
 import { useColumnStore } from '@entities/column/model'
 import { useTaskStore } from '@entities/task/model'
 import { useUserStore } from '@entities/user/model'
+import { resetBoard } from '@features/board-sync/boardSync'
 import { BOARD_CODE } from '@shared/config/board'
 import { useUiStore } from '@shared/lib/useUiStore'
 import { Avatar } from '@shared/ui/Avatar'
@@ -18,11 +20,13 @@ export function ProfilePage() {
   const user = useUserStore((s) => s.user)
   const logout = useUserStore((s) => s.logout)
   const setScreen = useUiStore((s) => s.setScreen)
+  const code = useBoardStore((s) => s.board?.code ?? BOARD_CODE)
   const clips = useTaskStore((s) => s.tasks.length)
   const reels = useColumnStore((s) => s.columns.length)
 
   const handleLogout = () => {
     logout()
+    resetBoard()
     setScreen('login')
   }
 
@@ -69,7 +73,7 @@ export function ProfilePage() {
             <div>
               <dt className={styles.factKey}>код доски</dt>
               <dd className={styles.factVal} data-numeric>
-                {BOARD_CODE}
+                {code}
               </dd>
             </div>
             <div>

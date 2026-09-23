@@ -1,72 +1,67 @@
-import { BOARD_CODE } from '@shared/config/board'
-import { useEffect, useRef, useState } from 'react'
+import { currentBoardCode, useBoardStore } from '@entities/board/model'
+import { BoardModal } from '@features/board-switch/BoardModal'
+import { AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
 import styles from './BoardCode.module.scss'
 
 /**
- * Copies the board code so it can be sent to whoever should join.
- *
- * Copying is the whole feature for now, and it is a real one — there is no
- * invite endpoint to call, and a button that opened an empty "invite" dialog
- * would promise a server that does not exist yet.
+ * The board chip in the bar. It shows which board you are on and opens the
+ * boards dialog: copy this board's code, join another by code, or create one.
  */
 export function BoardCode() {
-  const [copied, setCopied] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), [])
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(BOARD_CODE)
-    } catch {
-      // Clipboard access can be refused; the code is on screen either way.
-      return
-    }
-    setCopied(true)
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => setCopied(false), 1800)
-  }
+  const [open, setOpen] = useState(false)
+  const code = useBoardStore((s) => s.board?.code) ?? currentBoardCode()
 
   return (
-    <button
-      type="button"
-      className={`${styles.code} ${copied ? styles.copied : ''}`}
-      onClick={copy}
-      aria-label={`Код доски ${BOARD_CODE}. Скопировать, чтобы пригласить участника`}
-    >
-      <svg className={styles.icon} viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        {copied ? (
-          <path
-            d="M3 8.6 6.2 12 13 4.6"
+    <>
+      <button
+        type="button"
+        className={styles.code}
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-label={`Доска ${code}. Открыть: присоединиться к другой доске или создать новую`}
+      >
+        <svg className={styles.icon} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect
+            x="2"
+            y="2.5"
+            width="5"
+            height="5"
+            rx="1.2"
             stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            strokeWidth="1.5"
           />
-        ) : (
-          <>
-            <rect
-              x="5.4"
-              y="5.4"
-              width="8.2"
-              height="8.2"
-              rx="1.6"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M10.6 5.4V3.9A1.5 1.5 0 0 0 9.1 2.4H3.9a1.5 1.5 0 0 0-1.5 1.5v5.2a1.5 1.5 0 0 0 1.5 1.5h1.5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </>
-        )}
-      </svg>
-      <span className={styles.value} data-numeric>
-        {BOARD_CODE}
-      </span>
-      {copied && <span className={styles.hint}>скопировано</span>}
-    </button>
+          <rect
+            x="9"
+            y="2.5"
+            width="5"
+            height="5"
+            rx="1.2"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <rect
+            x="2"
+            y="9.5"
+            width="5"
+            height="4"
+            rx="1.2"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <path
+            d="M11.5 9.6v3.8M9.6 11.5h3.8"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className={styles.value} data-numeric>
+          {code}
+        </span>
+      </button>
+
+      <AnimatePresence>{open && <BoardModal onClose={() => setOpen(false)} />}</AnimatePresence>
+    </>
   )
 }

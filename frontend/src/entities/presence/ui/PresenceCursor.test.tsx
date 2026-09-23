@@ -20,6 +20,9 @@ const baseNodeProps = {
 
 const user: PresenceUser = {
   id: 'p1',
+  userId: 'u1',
+  boardId: 'board-1',
+  lastSeen: 0,
   name: 'Карчевский',
   color: '#d1558f',
   cursor: { x: 300, y: 120 },

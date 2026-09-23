@@ -8,3 +8,7 @@
  */
 export const BOARD_ID = 'board-1'
 export const BOARD_CODE = 'CHK-B1D4'
+
+/** Size of a task card on the canvas. */
+export const CARD_WIDTH = 250
+export const CARD_HEIGHT = 132

@@ -109,3 +109,16 @@
     padding: 0 14px;
   }
 }
+
+// On a phone the bar cannot hold the wordmark, the code, the action, the
+// presence stack and the profile button: the profile button — the only way to
+// log out — was being pushed off-screen. Presence yields first.
+@media (max-width: 520px) {
+  .stack {
+    display: none;
+  }
+
+  .word {
+    font-size: 17px;
+  }
+}

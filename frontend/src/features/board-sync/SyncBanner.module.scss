@@ -1,0 +1,53 @@
+@use '../../app/styles/bench' as bench;
+
+// Sits over the canvas, bottom-left, clear of the zoom controls' column.
+.banner,
+.status {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  z-index: 20;
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(420px, calc(100% - 40px));
+  padding: 10px 12px 10px 14px;
+  color: var(--room);
+  background: var(--deck-raised);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-md);
+  box-shadow: var(--lift-panel);
+}
+
+.status {
+  color: var(--room-dim);
+  pointer-events: none;
+}
+
+.close {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  color: var(--room-dim);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--room);
+    background: var(--rule);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}

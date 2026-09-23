@@ -1,3 +1,4 @@
+import { stubColumnWrites } from '@app/test-api'
 import { useColumnStore } from '@entities/column/model'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,6 +24,7 @@ vi.mock('@floating-ui/react', async (importOriginal) => {
 // this component. The click handlers only care about a `click` event.
 describe('AddMenu', () => {
   beforeEach(() => {
+    stubColumnWrites()
     useColumnStore.setState({
       columns: [{ id: 'col-a', name: 'A', color: 'red', position: { x: 0, y: 0 } }],
     })

@@ -1,6 +1,7 @@
+import { stubColumnWrites, stubTaskWrites } from '@app/test-api'
 import { useTaskStore } from '@entities/task/model'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useColumnStore } from './model'
+import { columnAtCard, columnHeight, freeCardsInside, useColumnStore } from './model'
 
 describe('useColumnStore', () => {
   beforeEach(() => {
@@ -14,6 +15,8 @@ describe('useColumnStore', () => {
       ],
     })
     useTaskStore.setState({ tasks: [] })
+    stubColumnWrites()
+    stubTaskWrites()
   })
 
   it('addColumn appends a new column with a cascading position', () => {
@@ -68,5 +71,81 @@ describe('useColumnStore', () => {
     const columns = useColumnStore.getState().columns
     expect(columns.find((c) => c.id === 'col-a')?.position).toEqual({ x: 999, y: 999 })
     expect(columns.find((c) => c.id === 'col-b')?.position).toEqual({ x: 300, y: 0 })
+  })
+})
+
+describe('columnAtCard', () => {
+  const cols = [
+    { id: 'a', position: { x: 0, y: 0 } },
+    { id: 'b', position: { x: 340, y: 0 } },
+  ]
+
+  it('finds the column a card is dropped in', () => {
+    expect(columnAtCard({ x: 26, y: 86 }, cols)).toBe('a')
+    expect(columnAtCard({ x: 366, y: 86 }, cols)).toBe('b')
+  })
+
+  it('a card dropped in the gap or outside every column belongs to none', () => {
+    expect(columnAtCard({ x: 1000, y: 86 }, cols)).toBeUndefined()
+    expect(columnAtCard({ x: 26, y: -400 }, cols)).toBeUndefined()
+    expect(columnAtCard({ x: 26, y: 900 }, cols)).toBeUndefined()
+  })
+
+  it('uses the card centre: a card hanging mostly out does not count as inside', () => {
+    // top-left corner is inside column a (x 0..300), but the centre (x+125) is past its edge
+    expect(columnAtCard({ x: 290, y: 86 }, [cols[0]])).toBeUndefined()
+    // ...and the same card is inside when most of it is over the column
+    expect(columnAtCard({ x: 100, y: 86 }, [cols[0]])).toBe('a')
+  })
+})
+
+describe('freeCardsInside', () => {
+  const col = { id: 'a', position: { x: 0, y: 0 } }
+
+  it('takes in free cards the column now covers, and only those', () => {
+    const tasks = [
+      { id: 'inside-free', columnId: null, position: { x: 30, y: 90 } },
+      { id: 'outside-free', columnId: null, position: { x: 900, y: 90 } },
+      { id: 'inside-other', columnId: 'b', position: { x: 30, y: 90 } },
+    ]
+    expect(freeCardsInside(col, tasks).map((t) => t.id)).toEqual(['inside-free'])
+  })
+
+  it('leaves cards that already belong to a column (even this one) untouched', () => {
+    const tasks = [{ id: 'mine', columnId: 'a', position: { x: 30, y: 90 } }]
+    expect(freeCardsInside(col, tasks)).toEqual([])
+  })
+})
+
+describe('columns grow with their cards', () => {
+  const col = { id: 'a', position: { x: 0, y: 0 } }
+
+  it('keeps the standard height when the cards fit', () => {
+    expect(columnHeight(col, [{ columnId: 'a', position: { x: 26, y: 86 } }])).toBe(470)
+    expect(columnHeight(col, [])).toBe(470)
+  })
+
+  it('grows to hold a card that would hang below the standard height, with room to spare', () => {
+    const h = columnHeight(col, [{ columnId: 'a', position: { x: 26, y: 700 } }])
+    expect(h).toBeGreaterThanOrEqual(700 + 132)
+  })
+
+  it('shrinks back once the low card is gone, and ignores other columns and free cards', () => {
+    const tasks = [
+      { columnId: 'b', position: { x: 0, y: 2000 } },
+      { columnId: null, position: { x: 0, y: 3000 } },
+    ]
+    expect(columnHeight(col, tasks)).toBe(470)
+  })
+
+  it('accounts for a column that sits lower on the canvas', () => {
+    const low = { id: 'c', position: { x: 0, y: 500 } }
+    expect(columnHeight(low, [{ columnId: 'c', position: { x: 26, y: 586 } }])).toBe(470)
+  })
+
+  it('a grown column counts cards in its extra area as inside (columnAtCard with heights)', () => {
+    const card = { x: 26, y: 560 } // centre y = 626, beyond 470
+    expect(columnAtCard(card, [col])).toBeUndefined()
+    expect(columnAtCard(card, [col], { a: 800 })).toBe('a')
   })
 })

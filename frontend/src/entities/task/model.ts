@@ -1,3 +1,7 @@
+import { currentBoardId } from '@entities/board/model'
+import { api } from '@shared/api'
+import { track } from '@shared/api/sync'
+import { CARD_HEIGHT, CARD_WIDTH } from '@shared/config/board'
 import { create } from 'zustand'
 
 export type TaskPriority = 'low' | 'medium' | 'high'
@@ -6,7 +10,8 @@ export interface Task {
   [key: string]: unknown
   id: string
   boardId: string
-  columnId: string
+  /** null = a free-floating card: it belongs to no column and never moves with one. */
+  columnId: string | null
   title: string
   description?: string
   priority: TaskPriority
@@ -22,84 +27,79 @@ export type TaskInput = Pick<
   'title' | 'description' | 'columnId' | 'priority' | 'tags' | 'dueDate'
 >
 
-// Sample data only — clearly mock, never presented as real user content.
-const mockTasks: Task[] = [
-  {
-    id: 'task-1',
-    boardId: 'board-1',
-    columnId: 'col-done',
-    title: 'Собрать макет доски',
-    description: 'Набросать структуру канваса и карточек',
-    priority: 'medium',
-    tags: ['design'],
-    position: { x: 686, y: 86 },
-    dueDate: '2026-09-15',
-    createdAt: '2026-09-10T09:00:00Z',
-    updatedAt: '2026-09-16T09:00:00Z',
-  },
-  {
-    id: 'task-2',
-    boardId: 'board-1',
-    columnId: 'col-progress',
-    title: 'Настроить React Flow',
-    description: 'Подключить канвас, пан/зум, кастомные ноды',
-    priority: 'high',
-    tags: ['frontend'],
-    position: { x: 366, y: 86 },
-    dueDate: '2026-09-18',
-    createdAt: '2026-09-11T09:00:00Z',
-    updatedAt: '2026-09-17T09:00:00Z',
-  },
-  {
-    id: 'task-3',
-    boardId: 'board-1',
-    columnId: 'col-progress',
-    title: 'Схема БД для задач',
-    description: 'Таблицы users/boards/tasks, миграции',
-    priority: 'high',
-    tags: ['backend'],
-    position: { x: 366, y: 252 },
-    dueDate: '2026-09-18',
-    createdAt: '2026-09-11T09:00:00Z',
-    updatedAt: '2026-09-17T09:00:00Z',
-  },
-  {
-    id: 'task-4',
-    boardId: 'board-1',
-    columnId: 'col-backlog',
-    title: 'Presence-курсоры',
-    description: 'Мок живых участников на канвасе',
-    priority: 'medium',
-    tags: ['frontend'],
-    position: { x: 46, y: 86 },
-    dueDate: '2026-09-27',
-    createdAt: '2026-09-12T09:00:00Z',
-    updatedAt: '2026-09-12T09:00:00Z',
-  },
-  {
-    id: 'task-5',
-    boardId: 'board-1',
-    columnId: 'col-backlog',
-    title: 'Фильтры и поиск',
-    priority: 'low',
-    tags: ['frontend'],
-    position: { x: 46, y: 252 },
-    createdAt: '2026-09-12T09:00:00Z',
-    updatedAt: '2026-09-12T09:00:00Z',
-  },
-]
+const CARD_GAP = 34
+
+/**
+ * Where a new card lands in a column: directly under the lowest card already
+ * there, or at the column's first slot when it is empty. Counting cards
+ * instead would stack a new one on top of a card that was dragged elsewhere.
+ */
+export function nextTaskPosition(
+  column: { id: string; position: { x: number; y: number } },
+  tasks: Pick<Task, 'columnId' | 'position'>[],
+): { x: number; y: number } {
+  const x = column.position.x + 26
+  const inColumn = tasks.filter((t) => t.columnId === column.id)
+  if (inColumn.length === 0) return { x, y: column.position.y + 86 }
+  return { x, y: Math.max(...inColumn.map((t) => t.position.y)) + CARD_HEIGHT + CARD_GAP }
+}
+
+/**
+ * Where a card that belongs to no column is put: in a row just above the
+ * columns, at the first spot not already taken by another free card. Used when
+ * a card is taken out of its column from the form, so it really leaves the
+ * column instead of staying visually inside it.
+ */
+export function freeSpotPosition(
+  columns: { position: { x: number; y: number } }[],
+  tasks: Pick<Task, 'columnId' | 'position'>[],
+): { x: number; y: number } {
+  const top = columns.length ? Math.min(...columns.map((c) => c.position.y)) : 0
+  const left = columns.length ? Math.min(...columns.map((c) => c.position.x)) : 0
+  const y = top - CARD_HEIGHT - 60
+  const free = tasks.filter((t) => t.columnId === null)
+  for (let slot = 0; ; slot++) {
+    const x = left + 26 + slot * (CARD_WIDTH + 24)
+    const taken = free.some(
+      (t) => Math.abs(t.position.x - x) < CARD_WIDTH && Math.abs(t.position.y - y) < CARD_HEIGHT,
+    )
+    if (!taken) return { x, y }
+  }
+}
+
+// A card created offline-first carries a temporary id until the server answers
+// with the real one. Any later write to that card waits for this promise so it
+// never targets an id the server has not heard of.
+const pendingCreates = new Map<string, Promise<string | undefined>>()
+
+async function realId(id: string): Promise<string | undefined> {
+  return pendingCreates.has(id) ? pendingCreates.get(id) : id
+}
 
 interface TaskState {
   tasks: Task[]
+  /** Replace the whole list with what the server returned. */
+  hydrate: (tasks: Task[]) => void
+  /** Local-only, called on every drag tick. Persist with `commitTask`. */
   moveTask: (id: string, position: { x: number; y: number }) => void
-  setColumn: (id: string, columnId: string) => void
+  /** Local-only: every card in a column follows when the column is dragged. */
+  shiftColumnTasks: (columnId: string, dx: number, dy: number) => void
+  /** Write the position of every card in a column (column drag end). */
+  commitColumnTasks: (columnId: string) => Promise<void>
+  /** Local-only column change while dragging. Persist with `commitTask`. */
+  setColumn: (id: string, columnId: string | null) => void
+  /** Write a card's current position + column to the server (drag end). */
+  commitTask: (id: string) => Promise<void>
   createTask: (input: TaskInput, position: { x: number; y: number }) => void
-  updateTask: (id: string, patch: TaskInput) => void
+  /** Edit a card. Pass `position` when the edit also moves it (e.g. to another column). */
+  updateTask: (id: string, patch: TaskInput & { position?: { x: number; y: number } }) => void
   deleteTask: (id: string) => void
 }
 
-export const useTaskStore = create<TaskState>((set) => ({
-  tasks: mockTasks,
+export const useTaskStore = create<TaskState>((set, get) => ({
+  tasks: [],
+
+  hydrate: (tasks) => set({ tasks }),
 
   moveTask: (id, position) =>
     set((state) => ({
@@ -113,28 +113,88 @@ export const useTaskStore = create<TaskState>((set) => ({
       ),
     })),
 
-  createTask: (input, position) =>
-    set((state) => {
-      const now = new Date().toISOString()
-      const task: Task = {
-        id: crypto.randomUUID(),
-        boardId: 'board-1',
-        position,
-        createdAt: now,
-        updatedAt: now,
-        ...input,
-      }
-      return { tasks: [...state.tasks, task] }
-    }),
+  shiftColumnTasks: (columnId, dx, dy) => {
+    if (dx === 0 && dy === 0) return
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.columnId === columnId
+          ? { ...t, position: { x: t.position.x + dx, y: t.position.y + dy } }
+          : t,
+      ),
+    }))
+  },
 
-  updateTask: (id, patch) =>
+  commitColumnTasks: async (columnId) => {
+    const ids = get()
+      .tasks.filter((t) => t.columnId === columnId)
+      .map((t) => t.id)
+    await Promise.all(ids.map((id) => get().commitTask(id)))
+  },
+
+  commitTask: async (id) => {
+    const task = get().tasks.find((t) => t.id === id)
+    if (!task) return
+    const { position, columnId } = task
+    const serverId = await realId(id)
+    if (!serverId) return
+    await track(api.tasks.update(serverId, { position, columnId }))
+  },
+
+  createTask: (input, position) => {
+    const now = new Date().toISOString()
+    const tempId = `tmp-${crypto.randomUUID()}`
+    const task: Task = {
+      ...input,
+      id: tempId,
+      boardId: currentBoardId(),
+      position,
+      createdAt: now,
+      updatedAt: now,
+    }
+    set((state) => ({ tasks: [...state.tasks, task] }))
+
+    const request = track(api.tasks.create(currentBoardId(), { ...input, position }), () =>
+      set((state) => ({ tasks: state.tasks.filter((t) => t.id !== tempId) })),
+    ).then((created) => {
+      pendingCreates.delete(tempId)
+      if (!created) return undefined
+      set((state) => ({
+        tasks: state.tasks.map((t) =>
+          t.id === tempId
+            ? { ...t, id: created.id, createdAt: created.createdAt, updatedAt: created.updatedAt }
+            : t,
+        ),
+      }))
+      return created.id
+    })
+    pendingCreates.set(tempId, request)
+  },
+
+  updateTask: (id, patch) => {
+    const before = get().tasks.find((t) => t.id === id)
     set((state) => ({
       tasks: state.tasks.map((t) =>
         t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t,
       ),
-    })),
+    }))
+    void realId(id).then((serverId) => {
+      if (!serverId) return
+      return track(api.tasks.update(serverId, patch), () => {
+        if (before) set((state) => ({ tasks: state.tasks.map((t) => (t.id === id ? before : t)) }))
+      })
+    })
+  },
 
-  deleteTask: (id) => set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
+  deleteTask: (id) => {
+    const before = get().tasks.find((t) => t.id === id)
+    set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) }))
+    void realId(id).then((serverId) => {
+      if (!serverId) return
+      return track(api.tasks.remove(serverId), () => {
+        if (before) set((state) => ({ tasks: [...state.tasks, before] }))
+      })
+    })
+  },
 }))
 
 export const priorityLabel: Record<TaskPriority, string> = {

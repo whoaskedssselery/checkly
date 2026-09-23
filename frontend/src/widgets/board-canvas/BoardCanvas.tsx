@@ -7,16 +7,28 @@ import {
   type NodeMouseHandler,
   type NodeTypes,
   ReactFlow,
+  type ReactFlowInstance,
   useViewport,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { COLUMN_HEIGHT, COLUMN_WIDTH, useColumnStore } from '@entities/column/model'
-import { mockPresenceUsers } from '@entities/presence/model'
+import { useBoardStore } from '@entities/board/model'
+import {
+  COLUMN_HEIGHT,
+  COLUMN_WIDTH,
+  columnAtCard,
+  columnHeight,
+  columnHeights,
+  freeCardsInside,
+  useColumnStore,
+} from '@entities/column/model'
+import { peersOnBoard, usePresenceStore } from '@entities/presence/model'
 import { PresenceCursor } from '@entities/presence/ui/PresenceCursor'
 import type { Task } from '@entities/task/model'
 import { useTaskStore } from '@entities/task/model'
 import { TaskCard, type TaskCardData } from '@entities/task/ui/TaskCard'
-import { useCallback, useMemo } from 'react'
+import { sendCursor } from '@features/presence/presenceChannel'
+import { CARD_HEIGHT, CARD_WIDTH } from '@shared/config/board'
+import { useCallback, useMemo, useRef } from 'react'
 import styles from './BoardCanvas.module.scss'
 import { ZoneNode } from './ZoneNode'
 
@@ -50,10 +62,20 @@ export function BoardCanvas({ onTaskClick }: BoardCanvasProps) {
   const columns = useColumnStore((s) => s.columns)
   const removeColumn = useColumnStore((s) => s.removeColumn)
   const moveColumnPosition = useColumnStore((s) => s.moveColumnPosition)
+  const commitColumn = useColumnStore((s) => s.commitColumn)
+  const commitTask = useTaskStore((s) => s.commitTask)
+  const shiftColumnTasks = useTaskStore((s) => s.shiftColumnTasks)
+  const commitColumnTasks = useTaskStore((s) => s.commitColumnTasks)
+  const peers = usePresenceStore((s) => s.peers)
+  const boardId = useBoardStore((s) => s.board?.id)
+  const flow = useRef<ReactFlowInstance | null>(null)
+
+  // Columns grow to hold their cards.
+  const heights = useMemo(() => columnHeights(columns, tasks), [columns, tasks])
 
   const zoneNodes: Node[] = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const t of tasks) counts[t.columnId] = (counts[t.columnId] ?? 0) + 1
+    for (const t of tasks) if (t.columnId) counts[t.columnId] = (counts[t.columnId] ?? 0) + 1
     return columns.map((col) => ({
       id: `zone-${col.id}`,
       type: 'zone',
@@ -62,6 +84,7 @@ export function BoardCanvas({ onTaskClick }: BoardCanvasProps) {
         label: col.name,
         color: col.color,
         count: counts[col.id] ?? 0,
+        height: heights[col.id] ?? COLUMN_HEIGHT,
         canDelete: columns.length > 1,
         onDelete: () => removeColumn(col.id),
       },
@@ -71,9 +94,9 @@ export function BoardCanvas({ onTaskClick }: BoardCanvasProps) {
       // React Flow keeps a node invisible until it has dimensions. Handing it
       // the size we already know removes the first-paint pop-in.
       initialWidth: COLUMN_WIDTH,
-      initialHeight: COLUMN_HEIGHT,
+      initialHeight: heights[col.id] ?? COLUMN_HEIGHT,
     }))
-  }, [columns, tasks, removeColumn])
+  }, [columns, tasks, heights, removeColumn])
 
   const taskNodes: Node[] = useMemo(
     () =>
@@ -82,16 +105,16 @@ export function BoardCanvas({ onTaskClick }: BoardCanvasProps) {
         type: 'task',
         position: task.position,
         data: task satisfies TaskCardData,
-        initialWidth: 250,
-        initialHeight: 132,
+        initialWidth: CARD_WIDTH,
+        initialHeight: CARD_HEIGHT,
       })),
     [tasks],
   )
 
   const presenceNodes: Node[] = useMemo(
     () =>
-      mockPresenceUsers.map((p) => ({
-        id: p.id,
+      peersOnBoard(peers, boardId).map((p) => ({
+        id: `presence-${p.id}`,
         type: 'presence',
         position: p.cursor,
         data: p,
@@ -101,7 +124,7 @@ export function BoardCanvas({ onTaskClick }: BoardCanvasProps) {
         initialWidth: 20,
         initialHeight: 22,
       })),
-    [],
+    [peers, boardId],
   )
 
   const nodes = useMemo(
@@ -121,45 +144,79 @@ export function BoardCanvas({ onTaskClick }: BoardCanvasProps) {
     const minX = Math.min(...points.map((p) => p.x))
     const minY = Math.min(...points.map((p) => p.y))
     const maxX = Math.max(...points.map((p) => p.x)) + COLUMN_WIDTH
-    const maxY = Math.max(...points.map((p) => p.y)) + COLUMN_HEIGHT
+    const maxY =
+      Math.max(...points.map((p) => p.y)) + Math.max(COLUMN_HEIGHT, ...Object.values(heights))
     return [
       [minX - CANVAS_MARGIN, minY - CANVAS_MARGIN],
       [maxX + CANVAS_MARGIN, maxY + CANVAS_MARGIN],
     ]
-  }, [columns, tasks])
-
-  const zoneRects = useMemo(
-    () =>
-      columns.map((c) => ({
-        id: c.id,
-        x1: c.position.x,
-        y1: c.position.y,
-        x2: c.position.x + COLUMN_WIDTH,
-        y2: c.position.y + COLUMN_HEIGHT,
-      })),
-    [columns],
-  )
+  }, [columns, tasks, heights])
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       for (const change of changes) {
         if (change.type !== 'position' || !change.position) continue
-        if (mockPresenceUsers.some((p) => p.id === change.id)) continue
+        if (change.id.startsWith('presence-')) continue
+
+        // React Flow reports `dragging: false` once, when the drag ends. Writes
+        // to the server happen then — not on every tick of the drag.
+        const dragEnded = change.dragging === false
 
         if (change.id.startsWith('zone-')) {
-          moveColumnPosition(change.id.slice(5), change.position)
+          const columnId = change.id.slice(5)
+          // The cards in a column travel with it: shift them by however far the
+          // column just moved, then save the column and its cards together.
+          const before = useColumnStore.getState().columns.find((c) => c.id === columnId)
+          if (before) {
+            shiftColumnTasks(
+              columnId,
+              change.position.x - before.position.x,
+              change.position.y - before.position.y,
+            )
+          }
+          moveColumnPosition(columnId, change.position)
+          if (dragEnded) {
+            // A column dropped over free-floating cards takes them in.
+            const column = useColumnStore.getState().columns.find((c) => c.id === columnId)
+            if (column) {
+              const all = useTaskStore.getState().tasks
+              for (const t of freeCardsInside(column, all, columnHeight(column, all))) {
+                setColumn(t.id, columnId)
+              }
+            }
+            void commitColumn(columnId)
+            void commitColumnTasks(columnId)
+          }
           continue
         }
 
         moveTask(change.id, change.position)
 
-        // A clip dropped inside a bin's rectangle is spliced onto that reel.
-        const { x, y } = change.position
-        const hit = zoneRects.find((z) => x >= z.x1 && x <= z.x2 && y >= z.y1 && y <= z.y2)
-        if (hit) setColumn(change.id, hit.id)
+        // A clip dropped inside a bin is spliced onto that reel. Dropped anywhere
+        // else it belongs to no column: it stays where it was put and no longer
+        // travels with the column it came from.
+        // Hit-test against the columns as they are WITHOUT this card: otherwise
+        // dragging a card down would keep growing its column and it could never
+        // be dragged out of the bottom.
+        const others = useTaskStore.getState().tasks.filter((t) => t.id !== change.id)
+        const cols = useColumnStore.getState().columns
+        const hit = columnAtCard(change.position, cols, columnHeights(cols, others))
+        if (hit) setColumn(change.id, hit)
+        if (dragEnded) {
+          if (!hit) setColumn(change.id, null)
+          void commitTask(change.id)
+        }
       }
     },
-    [moveTask, setColumn, moveColumnPosition, zoneRects],
+    [
+      moveTask,
+      setColumn,
+      moveColumnPosition,
+      commitColumn,
+      commitTask,
+      shiftColumnTasks,
+      commitColumnTasks,
+    ],
   )
 
   const handleNodeClick: NodeMouseHandler = useCallback(
@@ -171,8 +228,17 @@ export function BoardCanvas({ onTaskClick }: BoardCanvasProps) {
 
   return (
     <div className={styles.canvas}>
-      <div className={styles.flow}>
+      <div
+        className={styles.flow}
+        onPointerMove={(e) => {
+          const at = flow.current?.screenToFlowPosition({ x: e.clientX, y: e.clientY })
+          if (at) sendCursor(at.x, at.y)
+        }}
+      >
         <ReactFlow
+          onInit={(instance) => {
+            flow.current = instance
+          }}
           nodes={nodes}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}

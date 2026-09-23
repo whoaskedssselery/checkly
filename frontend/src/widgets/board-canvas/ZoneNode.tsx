@@ -1,4 +1,4 @@
-import { COLUMN_HEIGHT, COLUMN_WIDTH } from '@entities/column/model'
+import { COLUMN_WIDTH } from '@entities/column/model'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import type { CSSProperties } from 'react'
@@ -9,6 +9,7 @@ export interface ZoneData {
   label: string
   color: string
   count: number
+  height: number
   canDelete: boolean
   onDelete: () => void
 }
@@ -18,7 +19,7 @@ export function ZoneNode({ data }: { data: ZoneData }) {
     <motion.div
       className={styles.bin}
       style={
-        { '--reel-color': data.color, width: COLUMN_WIDTH, height: COLUMN_HEIGHT } as CSSProperties
+        { '--reel-color': data.color, width: COLUMN_WIDTH, height: data.height } as CSSProperties
       }
       initial={{ scale: 0.99 }}
       animate={{ scale: 1 }}

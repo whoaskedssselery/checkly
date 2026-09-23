@@ -26,6 +26,9 @@ const takes = [
 export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const login = useUserStore((s) => s.login)
+  const registerUser = useUserStore((s) => s.register)
+  const serverError = useUserStore((s) => s.error)
+  const clearError = useUserStore((s) => s.clearError)
   const setScreen = useUiStore((s) => s.setScreen)
 
   const {
@@ -34,9 +37,12 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
-  const onSubmit = (values: FormValues) => {
-    login(values.email, values.name)
-    setScreen('board')
+  const onSubmit = async (values: FormValues) => {
+    const ok =
+      mode === 'login'
+        ? await login(values.email, values.password)
+        : await registerUser(values.name ?? '', values.email, values.password)
+    if (ok) setScreen('board')
   }
 
   return (
@@ -69,7 +75,10 @@ export function LoginPage() {
                 type="button"
                 aria-pressed={mode === take.id}
                 className={styles.take}
-                onClick={() => setMode(take.id)}
+                onClick={() => {
+                  setMode(take.id)
+                  clearError()
+                }}
               >
                 {take.label}
                 {mode === take.id && (
@@ -108,6 +117,11 @@ export function LoginPage() {
               error={errors.password?.message}
               {...register('password')}
             />
+            {serverError && (
+              <p className={styles.formError} role="alert">
+                {serverError}
+              </p>
+            )}
             <Button type="submit" className={styles.submit} loading={isSubmitting}>
               {mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
             </Button>

@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { MotionGlobalConfig } from 'framer-motion'
+import { afterEach, beforeEach, vi } from 'vitest'
 
 // jsdom doesn't implement ResizeObserver, which @xyflow/react relies on to
 // measure the pane and nodes. A no-op stub is enough for render/interaction
@@ -54,3 +55,14 @@ if (!('DOMMatrixReadOnly' in globalThis)) {
 // the DOM. Skipping animations makes every enter/exit resolve at once; the
 // tests assert on state and markup, never on tweened values.
 MotionGlobalConfig.skipAnimations = true
+
+// Specs stub `api.*` with vi.spyOn; put every stub back between tests, and
+// start each one from a clean mock database and no session.
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+// A session is per tab; start every test signed out.
+beforeEach(() => {
+  sessionStorage.clear()
+})

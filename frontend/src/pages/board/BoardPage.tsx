@@ -1,15 +1,20 @@
 import type { Task } from '@entities/task/model'
+import { SyncBanner } from '@features/board-sync/SyncBanner'
+import { startPresence } from '@features/presence/presenceChannel'
 import { TaskFormModal } from '@features/task-editor/TaskFormModal'
 import { BenchBar } from '@widgets/bench-bar/BenchBar'
 import { BoardCanvas } from '@widgets/board-canvas/BoardCanvas'
 import { AnimatePresence } from 'framer-motion'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import styles from './BoardPage.module.scss'
 
 type ModalState = { mode: 'create' } | { mode: 'edit'; task: Task } | null
 
 export function BoardPage() {
   const [modal, setModal] = useState<ModalState>(null)
+
+  // Announce myself to other tabs while the board is on screen.
+  useEffect(() => startPresence(), [])
 
   return (
     <div className={styles.wrap}>
@@ -23,6 +28,7 @@ export function BoardPage() {
           Доска команды
         </h1>
         <BoardCanvas onTaskClick={(task) => setModal({ mode: 'edit', task })} />
+        <SyncBanner />
       </main>
 
       <AnimatePresence>

@@ -97,7 +97,9 @@
   border-radius: var(--r-lg);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006));
   overflow: visible;
-  transition: background-color 160ms ease;
+  // A column grows and shrinks with its cards; ease it so it reads as room
+  // being made, not a jump.
+  transition: background-color 160ms ease, height 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 // The region is defined by four marks in the reel's colour and nothing
@@ -204,4 +206,18 @@
   margin: 0 auto 12px;
   border: 1.5px dashed var(--rule-strong);
   border-radius: var(--r-sm);
+}
+
+// Another person's pointer glides between the positions they send instead of
+// jumping, which at ~25 updates a second reads as a hand rather than a flicker.
+.flow :global(.react-flow__node-presence) {
+  transition: transform 90ms linear;
+  pointer-events: none;
+}
+
+// Another person's pointer glides between the positions they send instead of
+// jumping, which at ~25 updates a second reads as a hand rather than a flicker.
+.flow :global(.react-flow__node-presence) {
+  transition: transform 90ms linear;
+  pointer-events: none;
 }
