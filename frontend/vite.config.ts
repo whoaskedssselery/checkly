@@ -14,6 +14,18 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, 'src/shared'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Long-lived vendor chunks: an app deploy does not invalidate them in
+        // the browser cache, and the canvas stack only loads with the board.
+        manualChunks: {
+          canvas: ['@xyflow/react'],
+          motion: ['framer-motion'],
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/app/test-setup.ts'],
