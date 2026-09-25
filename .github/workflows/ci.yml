@@ -69,10 +69,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Start the stack
-        run: docker compose up --build -d
-        env:
-          AUTH_RATE_LIMIT: '100000'
-          SEED_DEMO: '1'
+        run: |
+          cp .env.example .env
+          {
+            echo "JWT_ACCESS_SECRET=$(openssl rand -hex 32)"
+            echo "JWT_REFRESH_SECRET=$(openssl rand -hex 32)"
+            echo 'AUTH_RATE_LIMIT=100000'
+          } >> .env
+          docker compose up --build -d
       - name: Wait for the API
         run: timeout 120 sh -c 'until curl -sf localhost:3001/health; do sleep 2; done'
       - uses: pnpm/action-setup@v4
