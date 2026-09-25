@@ -1,0 +1,59 @@
+# The whole project in one command:
+#
+#   cp .env.example .env      # then set the two JWT secrets
+#   docker compose up --build
+#
+# Frontend  http://localhost:8080      API  http://localhost:3001
+# Demo login (SEED_DEMO=1):  demo@checkly.dev / demo1234
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: checkly
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-checkly}
+      POSTGRES_DB: checkly
+    volumes:
+      - checkly-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkly -d checkly"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Not published to the host on purpose: nothing outside the compose network needs it,
+    # and 5432 is often taken by a local Postgres.
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://checkly:${POSTGRES_PASSWORD:-checkly}@db:5432/checkly?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      PORT: 3001
+      # The browser origin of the frontend — the API answers only to it.
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-10}
+      SEED_DEMO: ${SEED_DEMO:-1}
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Where the BROWSER reaches the API (baked into the bundle).
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:3001}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  checkly-db-data:
