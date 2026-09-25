@@ -1,216 +1,83 @@
-# Checkly — задание по БД
+# Checkly — backend
 
-Модель состоит ровно из 4 таблиц:
+NestJS + Prisma + PostgreSQL. Пароли хэшируются bcrypt, сессии — пара
+access/refresh JWT, refresh одноразовый (ротация), в БД лежит только его
+SHA-256.
 
-- `users`
-- `boards`
-- `board_columns`
-- `tasks`
-
-Стек: PostgreSQL + Prisma.
-
-## Структура
-
-```text
-checkly-db/
-├── prisma/
-│   ├── schema.prisma
-│   ├── seed.ts
-│   └── migrations/
-│       └── 20260918150000_init/
-│           └── migration.sql
-├── sql/
-│   └── queries.sql
-├── .env.example
-├── .gitignore
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## 1. ER-диаграмма
-
-```mermaid
-erDiagram
-    USERS ||--o{ BOARDS : "владеет"
-    BOARDS ||--o{ BOARD_COLUMNS : "содержит"
-    BOARDS ||--o{ TASKS : "содержит"
-    BOARD_COLUMNS ||--o{ TASKS : "хранит"
-
-    USERS {
-        int id PK
-        varchar name
-        varchar email
-        varchar password_hash
-        varchar avatar_color
-        timestamp created_at
-    }
-
-    BOARDS {
-        int id PK
-        varchar name
-        int owner_id FK
-        timestamp created_at
-    }
-
-    BOARD_COLUMNS {
-        int id PK
-        int board_id FK
-        varchar name
-        varchar color
-        float position_x
-        float position_y
-        timestamp created_at
-    }
-
-    TASKS {
-        int id PK
-        int board_id FK
-        int column_id FK
-        varchar title
-        text description
-        varchar priority
-        text_array tags
-        float position_x
-        float position_y
-        timestamp due_date
-        timestamp created_at
-        timestamp updated_at
-    }
-```
-
-### Связи
-
-- `users.id` → `boards.owner_id` — 1:N
-- `boards.id` → `board_columns.board_id` — 1:N
-- `boards.id` → `tasks.board_id` — 1:N
-- `(board_columns.board_id, board_columns.id)` → `(tasks.board_id, tasks.column_id)` — составной FK, гарантирует, что задача лежит в колонке **своей** доски.
-
-### Почему 4 таблицы
-
-`board_columns` — самостоятельная сущность: у неё есть имя, цвет и координаты на холсте. Поэтому её не объединяем с `boards` и не заменяем простым enum-полем.
-
-### Удаление
-
-- `boards.owner_id` → `ON DELETE CASCADE`
-- `board_columns.board_id` → `ON DELETE CASCADE`
-- `tasks.board_id` → `ON DELETE CASCADE`
-- `tasks.(board_id, column_id)` → `ON DELETE RESTRICT`
-
-`RESTRICT` не позволяет удалить колонку, пока в ней находятся задачи. Сначала задачи переносятся в другую колонку. Это соответствует issue #4.
-
-## 2. Prisma
-
-Файл `prisma/schema.prisma` содержит полную модель базы.
-
-Для создания миграции:
+## Запуск
 
 ```bash
+# 1. БД
+docker compose up -d
+
+# 2. зависимости
+npm install
+
+# 3. окружение
+cp .env.example .env
+
+# 4. схема
 npx prisma migrate dev --name init
+# (или, если миграция уже в репо: npx prisma migrate deploy)
+
+# 5. разработка
+npm run start:dev
 ```
 
-SQL миграции уже положен в:
+API поднимется на `http://localhost:3001`.
 
-```text
-prisma/migrations/20260918150000_init/migration.sql
+## Эндпоинты
+
+### Auth
+| метод | путь | что делает |
+|---|---|---|
+| POST | `/auth/register` | `{ email, password, name? }` → `{ user, accessToken, refreshToken }` |
+| POST | `/auth/login` | `{ email, password }` → то же |
+| POST | `/auth/refresh` | `{ refreshToken }` → новая пара, старый отзывается |
+| POST | `/auth/logout` | `{ refreshToken? }` → 204, токен отозван |
+
+### Boards (нужен `Authorization: Bearer <accessToken>`)
+| метод | путь | что делает |
+|---|---|---|
+| GET | `/boards` | доски, где я участник |
+| POST | `/boards` | `{ name? }` — создаётся с тремя дефолтными колонками |
+| GET | `/boards/:id` | 403, если я не участник |
+| POST | `/boards/:id/members` | `{ email }` — добавить участника |
+
+### Columns
+| метод | путь | что делает |
+|---|---|---|
+| GET | `/boards/:id/columns` | список колонок доски |
+| POST | `/boards/:id/columns` | `{ name, color?, position: { x, y } }` |
+| PATCH | `/columns/:id` | частичный апдейт (обычно только `position`) |
+| DELETE | `/columns/:id` | задачи переезжают в первую оставшуюся; 400 на последней |
+
+### Tasks
+| метод | путь | что делает |
+|---|---|---|
+| GET | `/boards/:id/tasks` | все задачи доски |
+| POST | `/boards/:id/tasks` | `{ title, description?, columnId, priority, tags?, dueDate?, position }` |
+| PATCH | `/tasks/:id` | частичный апдейт — можно прислать только `{ position }` или `{ position, columnId }` |
+| DELETE | `/tasks/:id` | удаление |
+
+## Presence (WebSocket, socket.io)
+
+Подключение:
+```ts
+io('http://localhost:3001', { auth: { token: accessToken } })
 ```
 
-## 3. Ограничения целостности
+Протокол — см. `src/presence/presence.types.ts` (там же полный контракт
+в комментарии). Кратко:
 
-Помимо `PRIMARY KEY`, `FOREIGN KEY`, `NOT NULL` и `DEFAULT`, в схеме есть:
+**client → server**
+`board:join { boardId }`, `board:leave {}`, `cursor:move { x, y }`,
+`reaction:send { emoji }`
 
-### Регистронезависимая уникальность email
+**server → client**
+`presence:state { users }` (только вошедшему), `presence:join { user }`,
+`presence:leave { userId }`, `cursor:move { userId, x, y }`,
+`reaction:send { userId, emoji }`, `error { message }`
 
-```sql
-CREATE UNIQUE INDEX users_email_lower_key ON users (LOWER(email));
-```
-
-В Prisma-модели `@unique` на `email` **снят намеренно**: Prisma не умеет выражать функциональные индексы, поэтому уникальность `LOWER(email)` ведётся через raw SQL в миграции. Это закрывает классическую дыру авторизации, когда `ivan@test.com` и `IVAN@TEST.COM` создавали два разных аккаунта.
-
-### CHECK на priority
-
-```sql
-ALTER TABLE tasks
-ADD CONSTRAINT priority_check
-CHECK (priority IS NULL OR priority IN ('low', 'medium', 'high'));
-```
-
-Значения в нижнем регистре синхронизированы с фронтом (`entities/task/model.ts`: `'low' | 'medium' | 'high'`).
-
-### Составной FK «задача ↔ колонка своей доски»
-
-```sql
-CREATE UNIQUE INDEX board_columns_board_id_key ON board_columns (board_id, id);
-
-ALTER TABLE tasks
-ADD CONSTRAINT tasks_board_id_column_id_fkey
-FOREIGN KEY (board_id, column_id)
-REFERENCES board_columns (board_id, id)
-ON DELETE RESTRICT ON UPDATE CASCADE;
-```
-
-Не даёт вставить задачу с `board_id` одной доски и `column_id` колонки другой доски.
-
-> `CHECK` и функциональный уникальный индекс Prisma не отражает в `schema.prisma` — они живут только в SQL-миграции. Это ожидаемо.
-
-## 4. Индексы
-
-Создаются индексы:
-
-```sql
-CREATE UNIQUE INDEX users_email_lower_key ON users (LOWER(email));
-CREATE INDEX idx_boards_owner ON boards(owner_id);
-CREATE INDEX idx_columns_board ON board_columns(board_id);
-CREATE UNIQUE INDEX board_columns_board_id_key ON board_columns(board_id, id);
-CREATE INDEX idx_tasks_board ON tasks(board_id);
-CREATE INDEX idx_tasks_column ON tasks(column_id);
-```
-
-## 5. Тестовые данные
-
-`prisma/seed.ts` создаёт:
-
-- 5 пользователей;
-- 3 доски;
-- 3 колонки на каждую доску;
-- 10 задач.
-
-Запуск:
-
-```bash
-npx ts-node prisma/seed.ts
-```
-
-## 6. SELECT-запросы
-
-Все три запроса находятся в `sql/queries.sql`:
-
-1. Все задачи доски.
-2. Задачи колонки `Done` конкретной доски.
-3. Количество задач в каждой колонке.
-
-Там же — закомментированные INSERT-ы для проверки ограничений (email-регистр, CHECK на priority, составной FK).
-
-## 7. DBeaver
-
-После запуска миграции и seed:
-
-1. Подключиться к PostgreSQL.
-2. Открыть базу `checkly`.
-3. Убедиться, что есть 4 таблицы:
-   - `users`
-   - `boards`
-   - `board_columns`
-   - `tasks`
-4. Выполнить запросы из `sql/queries.sql`.
-5. Сделать скриншоты:
-   - дерева таблиц;
-   - результата первого SELECT;
-   - результата второго SELECT;
-   - результата третьего SELECT;
-   - ER Diagram в DBeaver.
-
-## 8. Известные ограничения
-
-- Prisma не отражает `CHECK` и функциональные индексы в `schema.prisma`. При `prisma migrate dev` есть риск, что Prisma захочет «удалить» `users_email_lower_key` как незнакомый индекс. Если это произойдёт — не принимайте такую миграцию, правьте её вручную.
-- Поле `tasks.priority` nullable. Если бизнес-логика требует обязательности — уберите `?` в `schema.prisma` и `IS NULL OR` из `priority_check`.
+Один сокет — ровно одна доска за раз. Комнаты: `board:<boardId>`.
+Неавторизованный сокет отключается сразу на `handleConnection`.

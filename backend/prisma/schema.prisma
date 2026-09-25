@@ -8,64 +8,92 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String   @db.VarChar(100)
-  email        String   @db.VarChar(150)
-  passwordHash String   @map("password_hash") @db.VarChar(255)
-  avatarColor  String?  @map("avatar_color") @db.VarChar(7)
-  createdAt    DateTime @default(now()) @map("created_at")
-  boards       Board[]  @relation("BoardOwner")
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  avatarColor  String   @default("var(--accent)")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  @@map("users")
+  refreshTokens RefreshToken[]
+  memberships   BoardMember[]
+  ownedBoards   Board[]       @relation("BoardOwner")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Board {
-  id        Int           @id @default(autoincrement())
-  name      String        @db.VarChar(150)
-  ownerId   Int           @map("owner_id")
-  createdAt DateTime      @default(now()) @map("created_at")
-  owner     User          @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  columns   BoardColumn[]
-  tasks     Task[]
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([ownerId], name: "idx_boards_owner")
-  @@map("boards")
+  owner   User          @relation("BoardOwner", fields: [ownerId], references: [id])
+  members BoardMember[]
+  columns Column[]
+  tasks   Task[]
 }
 
-model BoardColumn {
-  id        Int      @id @default(autoincrement())
-  boardId   Int      @map("board_id")
-  name      String   @db.VarChar(50)
-  color     String?  @db.VarChar(7)
-  positionX Float    @default(0) @map("position_x")
-  positionY Float    @default(0) @map("position_y")
-  createdAt DateTime @default(now()) @map("created_at")
-  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  tasks     Task[]
+model BoardMember {
+  id        String   @id @default(uuid())
+  boardId   String
+  userId    String
+  role      String   @default("member")
+  createdAt DateTime @default(now())
 
-  @@unique([boardId, id], name: "board_columns_board_id_key")
-  @@index([boardId], name: "idx_columns_board")
-  @@map("board_columns")
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userId])
+}
+
+model Column {
+  id        String   @id @default(uuid())
+  boardId   String
+  name      String
+  color     String
+  posX      Float
+  posY      Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@index([boardId])
 }
 
 model Task {
-  id          Int         @id @default(autoincrement())
-  boardId     Int         @map("board_id")
-  columnId    Int         @map("column_id")
-  title       String      @db.VarChar(255)
+  id          String    @id @default(uuid())
+  boardId     String
+  columnId    String
+  title       String
   description String?
-  priority    String?     @db.VarChar(10)
-  tags        String[]    @default([])
-  positionX   Float       @default(0) @map("position_x")
-  positionY   Float       @default(0) @map("position_y")
-  dueDate     DateTime?   @map("due_date")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  priority    String    @default("medium")
+  tags        String[]
+  dueDate     DateTime?
+  posX        Float
+  posY        Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  board  Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  column BoardColumn @relation(fields: [boardId, columnId], references: [boardId, id], onDelete: Restrict)
+  board  Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column Column @relation(fields: [columnId], references: [id])
 
-  @@index([boardId], name: "idx_tasks_board")
-  @@index([columnId], name: "idx_tasks_column")
-  @@map("tasks")
+  @@index([boardId])
+  @@index([columnId])
 }
