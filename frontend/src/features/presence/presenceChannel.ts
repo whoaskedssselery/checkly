@@ -1,16 +1,17 @@
 import { useBoardStore } from '@entities/board/model'
 import { type PresenceUser, usePresenceStore } from '@entities/presence/model'
 import { useUserStore } from '@entities/user/model'
+import { isMockApi } from '@shared/api'
+import { sendSocketCursor, startSocketPresence } from './socketPresence'
 
 /**
- * Live presence between open tabs of the same browser.
+ * Live presence between open tabs of the same browser (the mock backend's
+ * transport; with a real backend see socketPresence.ts).
  *
  * Each tab announces itself (who, which board) every couple of seconds and
  * streams its pointer position; other tabs on the same board draw it. A tab
  * that stops announcing (closed, crashed, asleep) disappears after a few
- * seconds. This is the real thing for everything sharing this browser — the
- * transport is the only mock: with a backend the same messages go over a
- * WebSocket instead (docs/release/backend-spec.md §10).
+ * seconds.
  */
 
 const CHANNEL = 'checkly-presence'
@@ -71,6 +72,10 @@ function announce() {
 
 /** Tell other tabs where this pointer is (board coordinates). Throttled. */
 export function sendCursor(x: number, y: number): void {
+  if (!isMockApi) {
+    sendSocketCursor(x, y)
+    return
+  }
   if (!channel) return
   const now = performance.now()
   if (now - lastCursorSent < CURSOR_THROTTLE_MS) return
@@ -98,7 +103,10 @@ function receive(msg: Message) {
 
 /** Start announcing and listening. Returns a function that stops both. */
 export function startPresence(): () => void {
-  if (import.meta.env.MODE === 'test' || typeof BroadcastChannel === 'undefined') return () => {}
+  if (import.meta.env.MODE === 'test') return () => {}
+  // A real backend: presence goes over its socket.io channel, between any machines.
+  if (!isMockApi) return startSocketPresence(import.meta.env.VITE_API_URL as string)
+  if (typeof BroadcastChannel === 'undefined') return () => {}
 
   channel = new BroadcastChannel(CHANNEL)
   const current = channel

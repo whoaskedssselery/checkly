@@ -122,3 +122,20 @@
     font-size: 17px;
   }
 }
+
+// A phone: the name is the first thing to give way so the profile stays in reach.
+@media (max-width: 480px) {
+  .bar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .meName,
+  .rule {
+    display: none;
+  }
+
+  .profile {
+    padding: 0 4px;
+  }
+}

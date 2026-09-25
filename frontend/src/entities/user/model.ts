@@ -68,6 +68,8 @@ export const useUserStore = create<UserState>((set) => {
     register: (name, email, password) => finish(api.auth.register({ name, email, password })),
     clearError: () => set({ error: null }),
     logout: () => {
+      // Revoke the refresh token on the server (fire and forget), then forget everything here.
+      void api.auth.logout()
       setToken(null)
       persist(null)
       set({ user: null, error: null })

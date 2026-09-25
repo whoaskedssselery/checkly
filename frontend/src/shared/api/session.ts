@@ -55,3 +55,24 @@ export function setSessionStartHandler(handler: (() => Promise<void>) | null): v
 export async function runSessionStart(): Promise<void> {
   await onSessionStart?.()
 }
+
+const REFRESH_KEY = 'checkly:refresh'
+
+// Kept next to the access token (same storage area, same trade-offs; see
+// OPEN-06 in the QA notes): only the real backend issues one.
+export function getRefreshToken(): string | null {
+  try {
+    return sessionArea().getItem(REFRESH_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setRefreshToken(token: string | null): void {
+  try {
+    if (token) sessionArea().setItem(REFRESH_KEY, token)
+    else sessionArea().removeItem(REFRESH_KEY)
+  } catch {
+    // storage blocked — the session simply won't renew itself
+  }
+}

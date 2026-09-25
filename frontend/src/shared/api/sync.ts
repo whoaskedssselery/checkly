@@ -7,12 +7,17 @@ import { describeApiError } from './errors'
  */
 interface SyncState {
   pending: number
+  /** True while a card is being dragged or a column resized: live reloads wait. */
+  interacting: boolean
+  setInteracting: (value: boolean) => void
   error: string | null
   dismiss: () => void
 }
 
 export const useSyncStore = create<SyncState>((set) => ({
   pending: 0,
+  interacting: false,
+  setInteracting: (interacting) => set({ interacting }),
   error: null,
   dismiss: () => set({ error: null }),
 }))

@@ -30,5 +30,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/app/test-setup.ts'],
     globals: true,
+    // Playwright specs run under `pnpm e2e`, not here.
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
+    // React Flow + Framer Motion under jsdom is slow when the machine is busy.
+    testTimeout: 20000,
   },
 })

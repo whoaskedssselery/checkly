@@ -9,7 +9,9 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "test:all": "vitest run && playwright test"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.20",
@@ -22,11 +24,13 @@
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.88.0",
     "sass": "^1.104.1",
+    "socket.io-client": "^4.8.3",
     "zod": "^4.6.5",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.6.7",

@@ -80,6 +80,8 @@ export interface CheckllyApi {
     register(input: { name: string; email: string; password: string }): Promise<AuthResult>
     login(input: { email: string; password: string }): Promise<AuthResult>
     me(): Promise<UserDto>
+    /** Revoke the server-side session, if there is one. */
+    logout(): Promise<void>
   }
   boards: {
     /** Boards the caller is a member of. */

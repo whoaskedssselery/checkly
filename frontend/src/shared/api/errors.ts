@@ -5,7 +5,9 @@ export type ApiErrorCode =
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
   | 'NOT_FOUND'
-  | 'COLUMN_NOT_EMPTY'
+  | 'CONFLICT'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'RATE_LIMITED'
   | 'NETWORK_ERROR'
   | 'SERVER_ERROR'
 
@@ -35,7 +37,9 @@ const messages: Record<ApiErrorCode, string> = {
   UNAUTHORIZED: 'Сессия истекла — войдите снова',
   FORBIDDEN: 'Нет доступа к этой доске',
   NOT_FOUND: 'Объект не найден — возможно, его уже удалили',
-  COLUMN_NOT_EMPTY: 'В колонке есть задачи — сначала перенесите их',
+  CONFLICT: 'Действие уже выполнено или невозможно',
+  PAYLOAD_TOO_LARGE: 'Слишком большой запрос',
+  RATE_LIMITED: 'Слишком много попыток — подождите минуту',
   NETWORK_ERROR: 'Нет связи с сервером',
   SERVER_ERROR: 'Ошибка сервера, попробуйте ещё раз',
 }

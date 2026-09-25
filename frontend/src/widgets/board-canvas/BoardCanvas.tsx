@@ -30,6 +30,7 @@ import type { Task } from '@entities/task/model'
 import { useTaskStore } from '@entities/task/model'
 import { TaskCard, type TaskCardData } from '@entities/task/ui/TaskCard'
 import { sendCursor } from '@features/presence/presenceChannel'
+import { useSyncStore } from '@shared/api/sync'
 import { CARD_HEIGHT, CARD_WIDTH } from '@shared/config/board'
 import { useCallback, useMemo, useRef } from 'react'
 import styles from './BoardCanvas.module.scss'
@@ -272,6 +273,8 @@ export function BoardCanvas({ onTaskClick }: BoardCanvasProps) {
           nodes={nodes}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
+          onNodeDragStart={() => useSyncStore.getState().setInteracting(true)}
+          onNodeDragStop={() => useSyncStore.getState().setInteracting(false)}
           onNodeClick={handleNodeClick}
           translateExtent={translateExtent}
           minZoom={0.35}

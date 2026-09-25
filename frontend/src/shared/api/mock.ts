@@ -241,8 +241,9 @@ function currentUser(db: Db): StoredUser {
 function memberBoard(db: Db, boardId: string): StoredBoard {
   const user = currentUser(db)
   const board = db.boards.find((b) => b.id === boardId)
-  if (!board) throw new ApiError(404, 'NOT_FOUND', 'Board not found')
-  if (!board.memberIds.includes(user.id))
+  // An unknown board and one you may not see answer alike (403): the API does
+  // not confirm which board ids exist to someone probing it.
+  if (!board?.memberIds.includes(user.id))
     throw new ApiError(403, 'FORBIDDEN', 'Not a member of this board')
   return board
 }
@@ -367,6 +368,10 @@ export const mockApi: CheckllyApi = {
       return { token: `mock.${user.id}`, user: publicUser(user) }
     },
 
+    async logout() {
+      // Nothing to revoke: the mock has no refresh tokens.
+    },
+
     async me() {
       await latency()
       return publicUser(currentUser(load()))
@@ -441,6 +446,7 @@ export const mockApi: CheckllyApi = {
       currentUser(db)
       const column = db.columns.find((c) => c.id === columnId)
       if (!column) throw new ApiError(404, 'NOT_FOUND', 'Column not found')
+      memberBoard(db, column.boardId)
       if (patch.name !== undefined && !String(patch.name).trim())
         invalid({ name: 'Name is required' })
       if (patch.position !== undefined && !isPoint(patch.position))
@@ -464,11 +470,15 @@ export const mockApi: CheckllyApi = {
       await latency()
       const db = load()
       currentUser(db)
-      if (!db.columns.some((c) => c.id === columnId))
-        throw new ApiError(404, 'NOT_FOUND', 'Column not found')
-      // Mirrors ON DELETE RESTRICT on tasks(board_id, column_id).
-      if (db.tasks.some((t) => t.columnId === columnId))
-        throw new ApiError(409, 'COLUMN_NOT_EMPTY', 'Column still has tasks')
+      const target = db.columns.find((c) => c.id === columnId)
+      if (!target) throw new ApiError(404, 'NOT_FOUND', 'Column not found')
+      memberBoard(db, target.boardId)
+      // Same as the backend: cards are never lost with their column. They move
+      // to the first remaining column of the board; the last column stays.
+      const column = db.columns.find((c) => c.id === columnId)
+      const fallback = db.columns.find((c) => c.boardId === column?.boardId && c.id !== columnId)
+      if (!fallback) invalid({ column: 'The last column of a board cannot be deleted' })
+      for (const t of db.tasks) if (t.columnId === columnId) t.columnId = fallback.id
       db.columns = db.columns.filter((c) => c.id !== columnId)
       save(db)
     },
@@ -510,7 +520,14 @@ export const mockApi: CheckllyApi = {
       currentUser(db)
       const task = db.tasks.find((t) => t.id === taskId)
       if (!task) throw new ApiError(404, 'NOT_FOUND', 'Task not found')
+      memberBoard(db, task.boardId)
       checkTask(db, patch, true)
+      // A card can never move into another board's column.
+      if (
+        patch.columnId &&
+        !db.columns.some((c) => c.id === patch.columnId && c.boardId === task.boardId)
+      )
+        throw new ApiError(404, 'NOT_FOUND', 'Column not found')
       Object.assign(task, patch, { updatedAt: new Date().toISOString() })
       if (typeof patch.title === 'string') task.title = patch.title.trim()
       save(db)
@@ -521,8 +538,9 @@ export const mockApi: CheckllyApi = {
       await latency()
       const db = load()
       currentUser(db)
-      if (!db.tasks.some((t) => t.id === taskId))
-        throw new ApiError(404, 'NOT_FOUND', 'Task not found')
+      const existing = db.tasks.find((t) => t.id === taskId)
+      if (!existing) throw new ApiError(404, 'NOT_FOUND', 'Task not found')
+      memberBoard(db, existing.boardId)
       db.tasks = db.tasks.filter((t) => t.id !== taskId)
       save(db)
     },

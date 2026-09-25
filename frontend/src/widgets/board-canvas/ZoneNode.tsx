@@ -5,6 +5,7 @@ import {
   type ResizeDir,
   resizeRect,
 } from '@entities/column/model'
+import { useSyncStore } from '@shared/api/sync'
 import { useStore } from '@xyflow/react'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
@@ -70,6 +71,7 @@ export function ZoneNode({ data }: { data: ZoneData }) {
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
     drag.current = { dir, px: e.clientX, py: e.clientY, start: current() }
+    useSyncStore.getState().setInteracting(true)
   }
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
@@ -80,6 +82,7 @@ export function ZoneNode({ data }: { data: ZoneData }) {
     if (!drag.current) return
     drag.current = null
     e.currentTarget.releasePointerCapture(e.pointerId)
+    useSyncStore.getState().setInteracting(false)
     data.onResizeEnd()
   }
   const onKeyDown = (dir: ResizeDir) => (e: KeyboardEvent<HTMLDivElement>) => {
