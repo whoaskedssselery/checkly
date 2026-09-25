@@ -26,3 +26,72 @@ jobs:
       - run: npx tsc -b
       - run: pnpm test
       - run: pnpm build
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: checkly
+          POSTGRES_PASSWORD: checkly
+          POSTGRES_DB: checkly
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U checkly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://checkly:checkly@localhost:5432/checkly?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:e2e
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack
+        run: docker compose up --build -d
+        env:
+          AUTH_RATE_LIMIT: '100000'
+          SEED_DEMO: '1'
+      - name: Wait for the API
+        run: timeout 120 sh -c 'until curl -sf localhost:3001/health; do sleep 2; done'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - name: Contract suite against the real API
+        run: pnpm exec vitest run src/shared/api/contract.test.ts
+        working-directory: frontend
+        env:
+          CONTRACT_API_URL: http://localhost:3001
+      - name: Browser tests
+        run: pnpm e2e
+        working-directory: frontend
+      - if: failure()
+        run: docker compose logs --tail 200
