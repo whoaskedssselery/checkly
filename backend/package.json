@@ -10,7 +10,14 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "seed": "prisma db seed",
+    "test": "jest --selectProjects unit",
+    "test:e2e": "jest --selectProjects e2e",
+    "test:all": "jest"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
@@ -26,8 +33,10 @@
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "helmet": "^8.3.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "prisma": "^5.22.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1"
@@ -35,12 +44,42 @@
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.2.3",
+    "@nestjs/testing": "^10.4.22",
     "@types/bcrypt": "^5.0.2",
     "@types/express": "^4.17.21",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.10.2",
     "@types/passport-jwt": "^4.0.1",
-    "prisma": "^5.22.0",
+    "@types/supertest": "^7.2.1",
+    "jest": "^30.5.2",
+    "socket.io-client": "^4.8.4",
+    "supertest": "^7.3.0",
+    "ts-jest": "^29.4.14",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
+  },
+  "jest": {
+    "projects": [
+      {
+        "displayName": "unit",
+        "testEnvironment": "node",
+        "rootDir": "src",
+        "testRegex": ".*.spec.ts$",
+        "transform": {
+          "^.+.ts$": "ts-jest"
+        }
+      },
+      {
+        "displayName": "e2e",
+        "testEnvironment": "node",
+        "rootDir": "test",
+        "testRegex": ".*.e2e-spec.ts$",
+        "transform": {
+          "^.+.ts$": "ts-jest"
+        },
+        "testTimeout": 30000
+      }
+    ],
+    "maxWorkers": 1
   }
 }

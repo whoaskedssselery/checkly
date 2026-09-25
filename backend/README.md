@@ -4,11 +4,13 @@ NestJS + Prisma + PostgreSQL. Пароли хэшируются bcrypt, сесс
 access/refresh JWT, refresh одноразовый (ротация), в БД лежит только его
 SHA-256.
 
+Полный стек и тесты — в корневом [README](../README.md).
+
 ## Запуск
 
 ```bash
-# 1. БД
-docker compose up -d
+# 1. БД (из корня репозитория)
+docker compose up -d db
 
 # 2. зависимости
 npm install
@@ -17,8 +19,7 @@ npm install
 cp .env.example .env
 
 # 4. схема
-npx prisma migrate dev --name init
-# (или, если миграция уже в репо: npx prisma migrate deploy)
+npx prisma migrate deploy
 
 # 5. разработка
 npm run start:dev

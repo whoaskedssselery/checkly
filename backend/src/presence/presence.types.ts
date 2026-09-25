@@ -11,8 +11,9 @@
  *   server → client
  *     presence:state  { users: PresenceUser[] }   sent to the joiner only
  *     presence:join   { user: PresenceUser }      sent to everyone else
- *     presence:leave  { userId }                  sent to everyone else
- *     cursor:move     { userId, x, y }            sent to everyone else
+ *     presence:leave  { userId, clientId }        sent to everyone else
+ *     cursor:move     { userId, clientId, x, y }  sent to everyone else
+ *     board:changed   { boardId }                 sent to the whole room after any write
  *     reaction:send   { userId, emoji }           sent to everyone else
  *     error           { message }
  *
@@ -23,6 +24,8 @@
  */
 
 export interface PresenceUser {
+  /** The socket id: one per open tab. */
+  clientId: string;
   userId: string;
   name: string;
   avatarColor: string;

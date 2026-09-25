@@ -1,15 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { BoardsService } from '../boards/boards.service';
+import { toTask } from '../common/mappers';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import type { CreateTaskDto } from './dto/create-task.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
+
+/** A board holds at most this many cards: keeps one board from growing without bound. */
+const MAX_TASKS_PER_BOARD = 500;
 
 @Injectable()
 export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly boards: BoardsService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   async listForBoard(userId: string, boardId: string) {
@@ -23,15 +29,23 @@ export class TasksService {
 
   async create(userId: string, boardId: string, dto: CreateTaskDto) {
     await this.boards.assertMember(boardId, userId);
-    await this.assertColumnInBoard(dto.columnId, boardId);
+    if (dto.columnId) await this.assertColumnInBoard(dto.columnId, boardId);
+
+    const count = await this.prisma.task.count({ where: { boardId } });
+    if (count >= MAX_TASKS_PER_BOARD) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: `На доске не может быть больше ${MAX_TASKS_PER_BOARD} задач`,
+      });
+    }
 
     const task = await this.prisma.task.create({
       data: {
         boardId,
-        columnId: dto.columnId,
-        title: dto.title.trim(),
+        columnId: dto.columnId ?? null,
+        title: dto.title,
         description: dto.description?.trim() || null,
-        priority: dto.priority,
+        priority: dto.priority ?? 'medium',
         tags: dto.tags ?? [],
         dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         posX: dto.position.x,
@@ -39,6 +53,7 @@ export class TasksService {
       },
     });
 
+    this.realtime.boardChanged(boardId);
     return toTask(task);
   }
 
@@ -47,7 +62,7 @@ export class TasksService {
 
     const data: Prisma.TaskUpdateInput = {};
 
-    if (dto.title !== undefined) data.title = dto.title.trim();
+    if (dto.title !== undefined) data.title = dto.title;
     if (dto.description !== undefined) data.description = dto.description?.trim() || null;
     if (dto.priority !== undefined) data.priority = dto.priority;
     if (dto.tags !== undefined) data.tags = dto.tags;
@@ -58,18 +73,26 @@ export class TasksService {
       data.posX = dto.position.x;
       data.posY = dto.position.y;
     }
-    if (dto.columnId !== undefined && dto.columnId !== existing.columnId) {
+    if (dto.columnId === null) {
+      data.column = { disconnect: true };
+    } else if (dto.columnId !== undefined && dto.columnId !== existing.columnId) {
       await this.assertColumnInBoard(dto.columnId, existing.boardId);
       data.column = { connect: { id: dto.columnId } };
     }
 
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException({ code: 'VALIDATION_ERROR', message: 'Nothing to update' });
+    }
+
     const task = await this.prisma.task.update({ where: { id: taskId }, data });
+    this.realtime.boardChanged(existing.boardId);
     return toTask(task);
   }
 
   async remove(userId: string, taskId: string) {
-    await this.loadAuthorised(userId, taskId);
+    const existing = await this.loadAuthorised(userId, taskId);
     await this.prisma.task.delete({ where: { id: taskId } });
+    this.realtime.boardChanged(existing.boardId);
     return { removedTaskId: taskId };
   }
 
@@ -92,34 +115,4 @@ export class TasksService {
       throw new NotFoundException('Колонка не найдена на этой доске');
     }
   }
-}
-
-function toTask(task: {
-  id: string;
-  boardId: string;
-  columnId: string;
-  title: string;
-  description: string | null;
-  priority: string;
-  tags: string[];
-  dueDate: Date | null;
-  posX: number;
-  posY: number;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return {
-    id: task.id,
-    boardId: task.boardId,
-    columnId: task.columnId,
-    title: task.title,
-    description: task.description ?? undefined,
-    priority: task.priority,
-    tags: task.tags,
-    // The frame carries a date, not a timestamp: `YYYY-MM-DD`.
-    dueDate: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : undefined,
-    position: { x: task.posX, y: task.posY },
-    createdAt: task.createdAt,
-    updatedAt: task.updatedAt,
-  };
 }

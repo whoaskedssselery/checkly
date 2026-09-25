@@ -1,23 +1,47 @@
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { PositionDto } from '../../common/dto/position.dto';
+import { Trim } from '../../common/validation';
+
+export const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export class CreateColumnDto {
+  @Trim()
   @IsString()
   @MinLength(1, { message: 'Укажите название' })
-  @MaxLength(60)
+  @MaxLength(50)
   name!: string;
 
-  /**
-   * The frontend already owns reel colours; the server just stores whatever
-   * string comes in (a CSS var like `var(--reel-2)` today). No enum here.
-   */
+  /** #rrggbb, the same value the frontend palette uses. Optional: the server picks one. */
   @IsOptional()
   @IsString()
-  @MaxLength(120)
+  @Matches(HEX_COLOR, { message: 'Цвет должен быть в формате #rrggbb' })
   color?: string;
 
   @ValidateNested()
   @Type(() => PositionDto)
   position!: PositionDto;
+
+  /** Size the user gave the column by dragging its edges; omitted = standard. */
+  @IsOptional()
+  @IsNumber()
+  @Min(200)
+  @Max(5000)
+  width?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(120)
+  @Max(5000)
+  height?: number;
 }

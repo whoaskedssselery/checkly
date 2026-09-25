@@ -12,7 +12,7 @@ model User {
   email        String   @unique
   name         String
   passwordHash String
-  avatarColor  String   @default("var(--accent)")
+  avatarColor  String   @default("#d8a851")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -68,6 +68,9 @@ model Column {
   color     String
   posX      Float
   posY      Float
+  // Set by dragging the column's edges; null = the standard size.
+  width     Float?
+  height    Float?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -80,7 +83,8 @@ model Column {
 model Task {
   id          String    @id @default(uuid())
   boardId     String
-  columnId    String
+  // null = a free-floating card that belongs to no column
+  columnId    String?
   title       String
   description String?
   priority    String    @default("medium")
@@ -92,7 +96,7 @@ model Task {
   updatedAt   DateTime  @updatedAt
 
   board  Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  column Column @relation(fields: [columnId], references: [id])
+  column Column? @relation(fields: [columnId], references: [id])
 
   @@index([boardId])
   @@index([columnId])

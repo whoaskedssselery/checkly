@@ -1,7 +1,10 @@
 import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Trim } from '../../common/validation';
 
 export class RegisterDto {
+  @Trim()
   @IsEmail({}, { message: 'Некорректный email' })
+  @MaxLength(150)
   email!: string;
 
   @IsString()
@@ -12,7 +15,8 @@ export class RegisterDto {
   password!: string;
 
   @IsOptional()
+  @Trim()
   @IsString()
-  @MaxLength(80)
+  @MaxLength(100)
   name?: string;
 }

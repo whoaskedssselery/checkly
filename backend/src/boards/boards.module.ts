@@ -5,7 +5,7 @@ import { BoardsService } from './boards.service';
 @Module({
   controllers: [BoardsController],
   providers: [BoardsService],
-  // Columns, tasks and the presence gateway all need assertMember.
+  // Columns, tasks, auth (the personal board) and the presence gateway all need it.
   exports: [BoardsService],
 })
 export class BoardsModule {}

@@ -1,12 +1,9 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
+import { BoardsService } from '../boards/boards.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PUBLIC_USER_SELECT, type PublicUser, UsersService } from '../users/users.service';
 import type { LoginDto } from './dto/login.dto';
@@ -25,6 +22,8 @@ export interface AuthResult {
 
 const BCRYPT_ROUNDS = 10;
 
+const AVATAR_COLORS = ['#d8a851', '#6fa8a0', '#c46d5e', '#8a86c9', '#7fae6a'];
+
 // Computed once at boot. Comparing a submitted password against this when the
 // email does not exist keeps "unknown user" and "wrong password" the same
 // shape and roughly the same cost, so the response time does not tell an
@@ -36,6 +35,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
+    private readonly boards: BoardsService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -44,14 +44,27 @@ export class AuthService {
     const email = dto.email.trim().toLowerCase();
 
     const existing = await this.users.findByEmail(email);
-    if (existing) throw new ConflictException('Email уже занят');
+    if (existing) {
+      throw new ConflictException({ code: 'EMAIL_TAKEN', message: 'Email уже занят' });
+    }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const name = dto.name?.trim() || email.split('@')[0];
 
-    const user = await this.prisma.user.create({
-      data: { email, name, passwordHash },
-      select: PUBLIC_USER_SELECT,
+    // The account and its first board are made together: a new user is never
+    // boardless, and a failure leaves neither behind.
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email,
+          name,
+          passwordHash,
+          avatarColor: AVATAR_COLORS[randomBytes(1)[0] % AVATAR_COLORS.length],
+        },
+        select: PUBLIC_USER_SELECT,
+      });
+      await this.boards.createInTx(tx, created.id, `Доска ${name}`.slice(0, 80));
+      return created;
     });
 
     return this.issueSession(user);
@@ -67,7 +80,10 @@ export class AuthService {
     );
 
     if (!found || !passwordOk) {
-      throw new UnauthorizedException('Неверный email или пароль');
+      throw new UnauthorizedException({
+        code: 'INVALID_CREDENTIALS',
+        message: 'Неверный email или пароль',
+      });
     }
 
     const user = await this.users.publicById(found.id);

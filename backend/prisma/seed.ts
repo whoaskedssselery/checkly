@@ -1,209 +1,102 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
+/**
+ * Demo data for the frontend and the QA contract suite.
+ *
+ *   demo@checkly.dev / demo1234, one board "Доска команды" (code CHK-B1D4)
+ *   with three columns and five tasks — the same content the frontend mock
+ *   ships, so the UI looks the same on either backend.
+ *
+ * Re-running is safe: it wipes and recreates only the demo user's board.
+ */
 const prisma = new PrismaClient();
 
+const DEMO_EMAIL = 'demo@checkly.dev';
+const DEMO_PASSWORD = 'demo1234';
+const BOARD_CODE = 'CHK-B1D4';
+
 async function main() {
-  const users = await Promise.all([
-    prisma.user.create({
-      data: {
-        name: 'Иван',
-        email: 'ivan@test.com',
-        passwordHash: 'hash1',
-        avatarColor: '#e57373',
-      },
-    }),
-    prisma.user.create({
-      data: {
-        name: 'Мария',
-        email: 'maria@test.com',
-        passwordHash: 'hash2',
-        avatarColor: '#64b5f6',
-      },
-    }),
-    prisma.user.create({
-      data: {
-        name: 'Пётр',
-        email: 'petr@test.com',
-        passwordHash: 'hash3',
-        avatarColor: '#81c784',
-      },
-    }),
-    prisma.user.create({
-      data: {
-        name: 'Анна',
-        email: 'anna@test.com',
-        passwordHash: 'hash4',
-        avatarColor: '#ffb74d',
-      },
-    }),
-    prisma.user.create({
-      data: {
-        name: 'Сергей',
-        email: 'sergey@test.com',
-        passwordHash: 'hash5',
-        avatarColor: '#ba68c8',
-      },
-    }),
-  ]);
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
-  const boards = await Promise.all([
-    prisma.board.create({
-      data: {
-        name: 'Checkly MVP',
-        ownerId: users[0].id,
-      },
-    }),
-    prisma.board.create({
-      data: {
-        name: 'Личные задачи',
-        ownerId: users[1].id,
-      },
-    }),
-    prisma.board.create({
-      data: {
-        name: 'Учебный проект',
-        ownerId: users[2].id,
-      },
-    }),
-  ]);
+  const user = await prisma.user.upsert({
+    where: { email: DEMO_EMAIL },
+    update: { passwordHash },
+    create: { email: DEMO_EMAIL, name: 'Демо', passwordHash, avatarColor: '#d8a851' },
+  });
 
-  const columnsByBoard: Record<number, number[]> = {};
+  await prisma.board.deleteMany({ where: { code: BOARD_CODE } });
 
-  for (const board of boards) {
-    const columns = await Promise.all([
-      prisma.boardColumn.create({
-        data: {
-          boardId: board.id,
-          name: 'Backlog',
-          color: '#90a4ae',
-          positionX: 100,
-          positionY: 200,
-        },
-      }),
-      prisma.boardColumn.create({
-        data: {
-          boardId: board.id,
-          name: 'In Progress',
-          color: '#42a5f5',
-          positionX: 500,
-          positionY: 200,
-        },
-      }),
-      prisma.boardColumn.create({
-        data: {
-          boardId: board.id,
-          name: 'Done',
-          color: '#66bb6a',
-          positionX: 900,
-          positionY: 200,
-        },
-      }),
-    ]);
+  const board = await prisma.board.create({
+    data: {
+      name: 'Доска команды',
+      code: BOARD_CODE,
+      ownerId: user.id,
+      members: { create: { userId: user.id, role: 'owner' } },
+    },
+  });
 
-    columnsByBoard[board.id] = columns.map((column) => column.id);
-  }
+  const [backlog, progress, done] = await Promise.all(
+    [
+      { name: 'Backlog', color: '#d9a441', posX: 20, posY: 0 },
+      { name: 'In progress', color: '#cfc6b2', posX: 340, posY: 0 },
+      { name: 'Done', color: '#9aa35e', posX: 660, posY: 0 },
+    ].map((c) => prisma.column.create({ data: { ...c, boardId: board.id } })),
+  );
+
+  const task = (
+    title: string,
+    columnId: string,
+    priority: 'low' | 'medium' | 'high',
+    posX: number,
+    posY: number,
+    extra: { description?: string; tags?: string[]; dueDate?: string } = {},
+  ) => ({
+    boardId: board.id,
+    columnId,
+    title,
+    priority,
+    posX,
+    posY,
+    description: extra.description ?? null,
+    tags: extra.tags ?? [],
+    dueDate: extra.dueDate ? new Date(extra.dueDate) : null,
+  });
 
   await prisma.task.createMany({
     data: [
-      {
-        boardId: boards[0].id,
-        columnId: columnsByBoard[boards[0].id][0],
-        title: 'Купить хлеб',
-        priority: 'low',
-        tags: ['быт'],
-        positionX: 120,
-        positionY: 220,
-      },
-      {
-        boardId: boards[0].id,
-        columnId: columnsByBoard[boards[0].id][0],
-        title: 'Позвонить маме',
-        priority: 'medium',
-        tags: ['семья'],
-        positionX: 140,
-        positionY: 240,
-      },
-      {
-        boardId: boards[0].id,
-        columnId: columnsByBoard[boards[0].id][1],
-        title: 'Сделать зарядку',
-        priority: 'high',
-        tags: ['спорт'],
-        positionX: 520,
-        positionY: 220,
-      },
-      {
-        boardId: boards[0].id,
-        columnId: columnsByBoard[boards[0].id][2],
-        title: 'Прочитать книгу',
-        priority: 'medium',
-        tags: ['развитие'],
-        positionX: 920,
-        positionY: 220,
-      },
-      {
-        boardId: boards[1].id,
-        columnId: columnsByBoard[boards[1].id][0],
-        title: 'Спринт-ревью',
-        priority: 'high',
-        tags: ['работа'],
-        positionX: 120,
-        positionY: 220,
-      },
-      {
-        boardId: boards[1].id,
-        columnId: columnsByBoard[boards[1].id][1],
-        title: 'Обновить резюме',
-        priority: 'medium',
-        tags: ['карьера'],
-        positionX: 520,
-        positionY: 220,
-      },
-      {
-        boardId: boards[1].id,
-        columnId: columnsByBoard[boards[1].id][2],
-        title: 'Записаться к врачу',
-        priority: 'high',
-        tags: ['здоровье'],
-        positionX: 920,
-        positionY: 220,
-      },
-      {
-        boardId: boards[2].id,
-        columnId: columnsByBoard[boards[2].id][0],
-        title: 'Лаба по БД',
-        priority: 'high',
-        tags: ['учёба', 'sql'],
-        positionX: 120,
-        positionY: 220,
-      },
-      {
-        boardId: boards[2].id,
-        columnId: columnsByBoard[boards[2].id][1],
-        title: 'Курсовая',
-        priority: 'high',
-        tags: ['учёба'],
-        positionX: 520,
-        positionY: 220,
-      },
-      {
-        boardId: boards[2].id,
-        columnId: columnsByBoard[boards[2].id][2],
-        title: 'Сдать отчёт',
-        priority: 'medium',
-        tags: ['учёба'],
-        positionX: 920,
-        positionY: 220,
-      },
+      task('Собрать макет доски', done.id, 'medium', 686, 86, {
+        description: 'Набросать структуру канваса и карточек',
+        tags: ['design'],
+        dueDate: '2026-09-15',
+      }),
+      task('Настроить React Flow', progress.id, 'high', 366, 86, {
+        description: 'Подключить канвас, пан/зум, кастомные ноды',
+        tags: ['frontend'],
+        dueDate: '2026-09-18',
+      }),
+      task('Схема БД для задач', progress.id, 'high', 366, 252, {
+        description: 'Таблицы users/boards/tasks, миграции',
+        tags: ['backend'],
+        dueDate: '2026-09-18',
+      }),
+      task('Presence-курсоры', backlog.id, 'medium', 46, 86, {
+        description: 'Живые участники на канвасе',
+        tags: ['frontend'],
+        dueDate: '2026-09-27',
+      }),
+      task('Фильтры и поиск', backlog.id, 'low', 46, 252, { tags: ['frontend'] }),
     ],
   });
 
-  console.log('Seed готов');
+  // eslint-disable-next-line no-console
+  console.log(`Seeded ${DEMO_EMAIL} / ${DEMO_PASSWORD}, board ${BOARD_CODE}`);
 }
 
 main()
-  .catch((error) => {
-    console.error(error);
+  .catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error(err);
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());

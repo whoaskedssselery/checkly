@@ -5,13 +5,16 @@ import {
   ConnectedSocket,
   MessageBody,
   type OnGatewayDisconnect,
+  type OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
 import { BoardsService } from '../boards/boards.service';
+import { isOriginAllowed } from '../common/cors';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService, roomOf } from '../realtime/realtime.service';
 import type {
   BoardJoinPayload,
   CursorMovePayload,
@@ -28,14 +31,14 @@ interface SocketState {
   cursor: { x: number; y: number };
 }
 
-const roomOf = (boardId: string) => `board:${boardId}`;
 const MAX_EMOJI_LENGTH = 8;
 
 @WebSocketGateway({
-  cors: { origin: true, credentials: true },
+  // Only the configured frontend origins (CORS_ORIGIN); non-browser clients have no Origin.
+  cors: { origin: (origin, done) => done(null, isOriginAllowed(origin)), credentials: true },
   transports: ['websocket', 'polling'],
 })
-export class PresenceGateway implements OnGatewayDisconnect {
+export class PresenceGateway implements OnGatewayInit, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
 
@@ -46,41 +49,52 @@ export class PresenceGateway implements OnGatewayDisconnect {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly boards: BoardsService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   /**
-   * Authenticate before any message is accepted. An unauthenticated socket
-   * is disconnected immediately rather than left connected and idle, so a
-   * client cannot sit on the socket waiting for a subscription to slip past.
+   * Hand the socket server to the rest of the app (so it can announce board
+   * changes) and put authentication in front of every connection.
+   *
+   * Authentication is a socket.io middleware, not a connection handler: the
+   * client's "connect" event fires only AFTER it passed. Checking in
+   * handleConnection instead leaves a window in which the client is already
+   * connected and can emit "board:join" before its token has been verified —
+   * the message would be silently dropped.
    */
-  async handleConnection(client: Socket): Promise<void> {
+  afterInit(server: Server): void {
+    this.realtime.attach(server);
+    server.use((client, next) => {
+      this.authenticate(client).then(
+        () => next(),
+        () => next(new Error('Unauthorized')),
+      );
+    });
+  }
+
+  private async authenticate(client: Socket): Promise<void> {
     const state = client.data as Partial<SocketState>;
 
-    try {
-      const token =
-        (client.handshake.auth?.token as string | undefined) ??
-        client.handshake.headers.authorization?.replace(/^Bearer\s+/i, '');
+    const token =
+      (client.handshake.auth?.token as string | undefined) ??
+      client.handshake.headers.authorization?.replace(/^Bearer\s+/i, '');
+    if (!token) throw new Error('missing token');
 
-      if (!token) throw new Error('missing token');
+    const payload = await this.jwt.verifyAsync<{ sub: string }>(token, {
+      secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
+    });
 
-      const payload = await this.jwt.verifyAsync<{ sub: string }>(token, {
-        secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
-      });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, name: true, avatarColor: true },
+    });
+    if (!user) throw new Error('unknown user');
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-        select: { id: true, name: true, avatarColor: true },
-      });
-      if (!user) throw new Error('unknown user');
-
-      state.userId = user.id;
-      state.name = user.name;
-      state.avatarColor = user.avatarColor;
-      state.boardId = null;
-      state.cursor = { x: 0, y: 0 };
-    } catch {
-      client.disconnect(true);
-    }
+    state.userId = user.id;
+    state.name = user.name;
+    state.avatarColor = user.avatarColor;
+    state.boardId = null;
+    state.cursor = { x: 0, y: 0 };
   }
 
   @SubscribeMessage('board:join')
@@ -114,6 +128,8 @@ export class PresenceGateway implements OnGatewayDisconnect {
     await client.join(roomOf(boardId));
 
     const me: PresenceUser = {
+      // One entry per open tab, so a person with two tabs is not removed when one closes.
+      clientId: client.id,
       userId: state.userId,
       name: state.name ?? '',
       avatarColor: state.avatarColor ?? 'var(--accent)',
@@ -142,6 +158,7 @@ export class PresenceGateway implements OnGatewayDisconnect {
     state.cursor = { x: payload.x, y: payload.y };
 
     client.to(roomOf(state.boardId)).emit('cursor:move', {
+      clientId: client.id,
       userId: state.userId,
       x: payload.x,
       y: payload.y,
@@ -177,7 +194,7 @@ export class PresenceGateway implements OnGatewayDisconnect {
     if (!state.boardId) return;
 
     const room = roomOf(state.boardId);
-    client.to(room).emit('presence:leave', { userId: state.userId });
+    client.to(room).emit('presence:leave', { userId: state.userId, clientId: client.id });
     await client.leave(room);
     state.boardId = null;
   }
@@ -198,6 +215,7 @@ export class PresenceGateway implements OnGatewayDisconnect {
       if (!state.userId) continue;
 
       peers.push({
+        clientId: socketId,
         userId: state.userId,
         name: state.name ?? '',
         avatarColor: state.avatarColor ?? 'var(--accent)',

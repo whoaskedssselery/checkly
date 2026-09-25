@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
+import { toColumn, toTask } from '../common/mappers';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import type { AddMemberDto } from './dto/add-member.dto';
 import type { CreateBoardDto } from './dto/create-board.dto';
 
@@ -15,12 +17,12 @@ import type { CreateBoardDto } from './dto/create-board.dto';
  * What a brand-new board opens with. These are ordinary rows, not an enum:
  * rename them, move them, delete them. They exist because a board with zero
  * columns is a board you cannot put a task on, and the very first thing the
- * frontend does is drop a card somewhere.
+ * frontend does is drop a card somewhere. Colours are #rrggbb.
  */
 const DEFAULT_COLUMNS = [
-  { name: 'Backlog', color: 'var(--reel-1)', posX: 20, posY: 0 },
-  { name: 'In progress', color: 'var(--reel-2)', posX: 340, posY: 0 },
-  { name: 'Done', color: 'var(--reel-3)', posX: 660, posY: 0 },
+  { name: 'Backlog', color: '#d9a441', posX: 20, posY: 0 },
+  { name: 'In progress', color: '#cfc6b2', posX: 340, posY: 0 },
+  { name: 'Done', color: '#9aa35e', posX: 660, posY: 0 },
 ];
 
 // No I, O, 0, 1 — the code gets read off a screen and typed by hand.
@@ -38,9 +40,14 @@ const BOARD_SUMMARY_SELECT = {
 
 type BoardSummaryRow = Prisma.BoardGetPayload<{ select: typeof BOARD_SUMMARY_SELECT }>;
 
+const MEMBER_USER_SELECT = { id: true, email: true, name: true, avatarColor: true } as const;
+
 @Injectable()
 export class BoardsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   async listForUser(userId: string) {
     const boards = await this.prisma.board.findMany({
@@ -52,10 +59,16 @@ export class BoardsService {
   }
 
   async create(userId: string, dto: CreateBoardDto) {
-    const name = dto.name?.trim() || 'Моя доска';
-    const code = await this.mintCode();
+    const board = await this.prisma.$transaction((tx) =>
+      this.createInTx(tx, userId, dto.name || 'Моя доска'),
+    );
+    return this.getForUser(userId, board.id);
+  }
 
-    const board = await this.prisma.board.create({
+  /** A board with the starter columns, owned by `userId`. Runs in the caller's transaction. */
+  async createInTx(tx: Prisma.TransactionClient, userId: string, name: string) {
+    const code = await this.mintCode(tx);
+    return tx.board.create({
       data: {
         name,
         code,
@@ -63,12 +76,11 @@ export class BoardsService {
         members: { create: { userId, role: 'owner' } },
         columns: { create: DEFAULT_COLUMNS },
       },
-      select: BOARD_SUMMARY_SELECT,
+      select: { id: true },
     });
-
-    return toBoardSummary(board);
   }
 
+  /** The whole board in one response: summary, members, columns and tasks. */
   async getForUser(userId: string, boardId: string) {
     await this.assertMember(boardId, userId);
 
@@ -78,13 +90,10 @@ export class BoardsService {
         ...BOARD_SUMMARY_SELECT,
         members: {
           orderBy: { createdAt: 'asc' },
-          select: {
-            role: true,
-            user: {
-              select: { id: true, email: true, name: true, avatarColor: true },
-            },
-          },
+          select: { role: true, user: { select: MEMBER_USER_SELECT } },
         },
+        columns: { orderBy: { createdAt: 'asc' } },
+        tasks: { orderBy: { createdAt: 'asc' } },
       },
     });
 
@@ -93,31 +102,56 @@ export class BoardsService {
     return {
       ...toBoardSummary(board),
       members: board.members.map((m) => ({ role: m.role, ...m.user })),
+      columns: board.columns.map(toColumn),
+      tasks: board.tasks.map(toTask),
     };
   }
 
+  /**
+   * Join a board by its shareable code. Idempotent: joining twice is not an
+   * error. An unknown code is a plain 404 — the code is the secret, and the
+   * answer does not say which part was wrong.
+   */
+  async joinByCode(userId: string, rawCode: string) {
+    const code = rawCode.trim().toUpperCase();
+    const board = await this.prisma.board.findUnique({ where: { code }, select: { id: true } });
+    if (!board) throw new NotFoundException('Доски с таким кодом нет');
+
+    await this.prisma.boardMember.upsert({
+      where: { boardId_userId: { boardId: board.id, userId } },
+      update: {},
+      create: { boardId: board.id, userId, role: 'member' },
+    });
+    this.realtime.boardChanged(board.id);
+    return this.getForUser(userId, board.id);
+  }
+
+  /** Owner-only: add someone to the board by email. */
   async addMember(userId: string, boardId: string, dto: AddMemberDto) {
     await this.assertMember(boardId, userId);
 
-    const email = dto.email.trim().toLowerCase();
-    const invitee = await this.prisma.user.findUnique({ where: { email } });
-    if (!invitee) {
-      throw new NotFoundException('Пользователь с таким email не найден');
+    const board = await this.prisma.board.findUnique({
+      where: { id: boardId },
+      select: { ownerId: true },
+    });
+    if (board?.ownerId !== userId) {
+      throw new ForbiddenException('Приглашать участников может только владелец доски');
     }
 
+    const invitee = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    // Unknown email and already-a-member answer the same way, so this cannot
+    // be used to find out who has an account.
+    if (!invitee) throw new NotFoundException('Не удалось добавить участника');
     const already = await this.prisma.boardMember.findUnique({
       where: { boardId_userId: { boardId, userId: invitee.id } },
     });
-    if (already) throw new ConflictException('Пользователь уже в этой доске');
+    if (already) throw new ConflictException('Не удалось добавить участника');
 
     const member = await this.prisma.boardMember.create({
       data: { boardId, userId: invitee.id, role: 'member' },
-      select: {
-        role: true,
-        user: { select: { id: true, email: true, name: true, avatarColor: true } },
-      },
+      select: { role: true, user: { select: MEMBER_USER_SELECT } },
     });
-
+    this.realtime.boardChanged(boardId);
     return { role: member.role, ...member.user };
   }
 
@@ -134,13 +168,10 @@ export class BoardsService {
     if (!member) throw new ForbiddenException('Нет доступа к этой доске');
   }
 
-  private async mintCode(): Promise<string> {
+  private async mintCode(tx: Prisma.TransactionClient): Promise<string> {
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const code = `CHK-${randomCode(4)}`;
-      const clash = await this.prisma.board.findUnique({
-        where: { code },
-        select: { id: true },
-      });
+      const clash = await tx.board.findUnique({ where: { code }, select: { id: true } });
       if (!clash) return code;
     }
     throw new BadRequestException('Не удалось сгенерировать код доски');
